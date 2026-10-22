@@ -207,6 +207,101 @@ public final class PortListViewModel {
         }
     }
 
+    /// Asynchronously terminates any process listening on the specified port number.
+    ///
+    /// - Parameter portNumber: The port number to terminate (1...65535).
+    /// - Returns: `true` if a process was found and terminated; `false` otherwise.
+    @discardableResult
+    public func killPortNumber(_ portNumber: Int) async -> Bool {
+        guard (1...65535).contains(portNumber) else {
+            self.errorMessage = "Porta inválida (\(portNumber)). Deve ser entre 1 e 65535."
+            return false
+        }
+
+        var matchingPorts = ports.filter { $0.port == portNumber }
+
+        // If not found in memory, try a fresh scan first to discover recently opened ports
+        if matchingPorts.isEmpty {
+            do {
+                let freshPorts = try await scanner.scan()
+                self.ports = freshPorts
+                matchingPorts = freshPorts.filter { $0.port == portNumber }
+            } catch {
+                self.errorMessage = sanitizeErrorMessage(error.localizedDescription)
+                return false
+            }
+        }
+
+        guard !matchingPorts.isEmpty else {
+            self.errorMessage = "Nenhum processo ativo encontrado na porta \(portNumber)."
+            return false
+        }
+
+        var allSucceeded = true
+        for port in matchingPorts {
+            guard let index = ports.firstIndex(where: { $0.id == port.id }) else { continue }
+            let removed = ports.remove(at: index)
+            do {
+                try await terminator.terminate(port: removed)
+            } catch {
+                if !ports.contains(where: { $0.id == removed.id }) {
+                    ports.append(removed)
+                    ports.sort { $0.port < $1.port }
+                }
+                self.errorMessage = sanitizeErrorMessage(error.localizedDescription)
+                allSucceeded = false
+            }
+        }
+
+        if allSucceeded {
+            self.errorMessage = nil
+            return true
+        }
+        return false
+    }
+
+    /// Asynchronously terminates multiple active ports in sequence.
+    ///
+    /// - Parameter toKill: Collection of active ports to terminate.
+    /// - Returns: The number of processes successfully terminated.
+    @discardableResult
+    public func killBatch(ports toKill: [ActivePort]) async -> Int {
+        var successCount = 0
+        for port in toKill {
+            guard let index = ports.firstIndex(where: { $0.id == port.id }) else { continue }
+            let removed = ports.remove(at: index)
+            do {
+                try await terminator.terminate(port: removed)
+                successCount += 1
+            } catch {
+                if !ports.contains(where: { $0.id == removed.id }) {
+                    ports.append(removed)
+                    ports.sort { $0.port < $1.port }
+                }
+                self.errorMessage = sanitizeErrorMessage(error.localizedDescription)
+            }
+        }
+        return successCount
+    }
+
+    /// Asynchronously terminates all ports matching the given category.
+    ///
+    /// - Parameter category: The filter category (.dev, .suggested, or .all).
+    /// - Returns: The number of processes successfully terminated.
+    @discardableResult
+    public func killAll(category: PortFilterCategory) async -> Int {
+        let targets: [ActivePort]
+        switch category {
+        case .dev:
+            targets = ports.filter { $0.category == .development }
+        case .suggested:
+            targets = ports.filter { $0.recommendation.isRecommendedToKill }
+        case .all:
+            targets = ports
+        }
+        return await killBatch(ports: targets)
+    }
+
     /// Opens the localhost URL for the specified port in the user's default browser.
     ///
     /// - Parameter port: The port number (must be in range 1...65535).

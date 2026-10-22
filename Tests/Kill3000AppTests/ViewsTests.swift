@@ -241,4 +241,23 @@ final class ViewsTests: XCTestCase {
         XCTAssertEqual(viewModel.devPortsCount, 2)
         XCTAssertEqual(viewModel.suggestedPortsCount, 1)
     }
+
+    func testDashboardViewBatchKillTypeIdentifiers() {
+        let dev = DashboardView.BatchKillType.dev
+        let suggested = DashboardView.BatchKillType.suggested
+        let displayed = DashboardView.BatchKillType.displayed
+
+        XCTAssertEqual(dev.id, "dev")
+        XCTAssertEqual(suggested.id, "suggested")
+        XCTAssertEqual(displayed.id, "displayed")
+    }
+
+    func testDashboardViewWithErrorMessageRendersBanner() {
+        let viewModel = PortListViewModel(scanner: MockPortScanner())
+        viewModel.errorMessage = "Falha ao terminar processo: Permissão negada."
+
+        let dashboard = DashboardView(viewModel: viewModel)
+        XCTAssertNotNil(dashboard.body)
+        XCTAssertEqual(viewModel.errorMessage, "Falha ao terminar processo: Permissão negada.")
+    }
 }

@@ -8,14 +8,33 @@ import Kill3000Engine
 /// - Dynamic WCAG AA contrast ratios (>= 4.5:1).
 /// - Native macOS semantic vibrancy materials (.ultraThinMaterial, .regularMaterial).
 /// - Comprehensive process forensics (PID, PPID, CWD, full arguments, uptime, safety analysis).
-/// - Direct one-click actions: Browser, Finder, and Terminate.
+/// - Direct actions: Manual port kill, batch termination, contextual menus, and keyboard shortcuts (⌘K, ⌘⌫).
 public struct DashboardView: View {
+    public enum BatchKillType: Identifiable, Sendable {
+        case dev
+        case suggested
+        case displayed
+
+        public var id: String {
+            switch self {
+            case .dev: return "dev"
+            case .suggested: return "suggested"
+            case .displayed: return "displayed"
+            }
+        }
+    }
+
     @Bindable public var viewModel: PortListViewModel
 
     @State private var selectedPortId: String? = nil
     @State private var dashboardFilterText: String = ""
     @State private var dashboardCategory: PortFilterCategory = .all
     @State private var isRefreshing: Bool = false
+    @State private var manualPortInput: String = ""
+    @State private var isExecutingManualKill: Bool = false
+    @State private var successBannerMessage: String? = nil
+    @State private var batchKillTarget: BatchKillType? = nil
+    @State private var showBatchConfirmation: Bool = false
 
     public init(viewModel: PortListViewModel) {
         self.viewModel = viewModel
@@ -26,10 +45,22 @@ public struct DashboardView: View {
             // Top Dashboard Header & Metric Cards
             headerMetricsBar
 
+            // Error banner if any operation failed
+            if let errorMessage = viewModel.errorMessage {
+                errorBanner(message: errorMessage)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            // Success feedback toast banner
+            if let successMessage = successBannerMessage {
+                successBanner(message: successMessage)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
             Divider()
                 .opacity(0.3)
 
-            // Search and Filter Bar
+            // Search, Category, and Quick Manual Kill Bar
             dashboardFilterBar
 
             Divider()
@@ -56,8 +87,57 @@ public struct DashboardView: View {
             // Bottom Status Bar
             dashboardFooterBar
         }
-        .frame(minWidth: 780, minHeight: 480)
+        .frame(minWidth: 800, minHeight: 480)
         .background(.ultraThinMaterial)
+        .sensoryFeedback(.impact(weight: .medium), trigger: viewModel.ports.count) { old, new in
+            new < old
+        }
+        .sensoryFeedback(.error, trigger: viewModel.errorMessage) { old, new in
+            new != nil
+        }
+        .onAppear {
+            if viewModel.ports.isEmpty {
+                Task {
+                    await viewModel.refresh()
+                }
+            }
+        }
+        .confirmationDialog(
+            "Terminar Processos em Lote",
+            isPresented: $showBatchConfirmation,
+            titleVisibility: .visible,
+            presenting: batchKillTarget
+        ) { target in
+            Button("Terminar Processos", role: .destructive) {
+                executeBatchKill(target: target)
+            }
+            Button("Cancelar", role: .cancel) {}
+        } message: { target in
+            switch target {
+            case .suggested:
+                Text("Tem a certeza de que deseja encerrar as \(viewModel.suggestedPortsCount) portas recomendadas a fechar?")
+            case .dev:
+                Text("Tem a certeza de que deseja encerrar todos os \(viewModel.devPortsCount) servidores de desenvolvimento?")
+            case .displayed:
+                Text("Tem a certeza de que deseja encerrar as \(displayedPorts.count) portas atualmente listadas?")
+            }
+        }
+        .background {
+            // Invisible buttons to capture keyboard shortcuts
+            Group {
+                Button("") {
+                    killSelectedPort()
+                }
+                .keyboardShortcut(.delete, modifiers: .command)
+
+                Button("") {
+                    killSelectedPort()
+                }
+                .keyboardShortcut("k", modifiers: .command)
+            }
+            .opacity(0)
+            .allowsHitTesting(false)
+        }
     }
 
     // MARK: - Selected Port Helper
@@ -113,6 +193,50 @@ public struct DashboardView: View {
 
                 Spacer()
 
+                // Batch Kill Menu
+                Menu {
+                    Button(role: .destructive) {
+                        batchKillTarget = .suggested
+                        showBatchConfirmation = true
+                    } label: {
+                        Label("Kill Sugeridas a Fechar (\(viewModel.suggestedPortsCount))", systemImage: "exclamationmark.triangle.fill")
+                    }
+                    .disabled(viewModel.suggestedPortsCount == 0)
+
+                    Button(role: .destructive) {
+                        batchKillTarget = .dev
+                        showBatchConfirmation = true
+                    } label: {
+                        Label("Kill Todos os Servidores Dev (\(viewModel.devPortsCount))", systemImage: "hammer.fill")
+                    }
+                    .disabled(viewModel.devPortsCount == 0)
+
+                    if !displayedPorts.isEmpty {
+                        Button(role: .destructive) {
+                            batchKillTarget = .displayed
+                            showBatchConfirmation = true
+                        } label: {
+                            Label("Kill Portas Visíveis (\(displayedPorts.count))", systemImage: "xmark.circle")
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 11, weight: .medium))
+
+                        Text("Kill em Lote")
+                            .font(.system(size: 11, weight: .medium, design: .default))
+                    }
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help("Terminar múltiplos processos em lote")
+
+                // Refresh Button
                 Button(action: {
                     Task {
                         isRefreshing = true
@@ -228,10 +352,86 @@ public struct DashboardView: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - Dashboard Filter Bar
+    // MARK: - Error & Success Banners
+
+    private func errorBanner(message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.orange)
+
+            Text(message)
+                .font(.system(size: 12, weight: .medium, design: .default))
+                .tracking(0.1)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+
+            Spacer()
+
+            Button(action: {
+                withAnimation(.snappy(duration: 0.15)) {
+                    viewModel.errorMessage = nil
+                }
+            }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Fechar aviso")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(Color.orange.opacity(0.35), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+    }
+
+    private func successBanner(message: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.green)
+
+            Text(message)
+                .font(.system(size: 12, weight: .medium, design: .default))
+                .tracking(0.1)
+                .foregroundStyle(.primary)
+
+            Spacer()
+
+            Button(action: {
+                withAnimation(.snappy(duration: 0.15)) {
+                    successBannerMessage = nil
+                }
+            }) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Fechar aviso")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .background(Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(Color.green.opacity(0.35), lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+    }
+
+    // MARK: - Dashboard Filter & Quick Kill Bar
 
     private var dashboardFilterBar: some View {
         HStack(spacing: 10) {
+            // Search Input Field
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 11, weight: .medium))
@@ -255,6 +455,7 @@ public struct DashboardView: View {
             .padding(.vertical, 5)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
 
+            // Category Segmented Control
             Picker("Filtro", selection: $dashboardCategory) {
                 Text("Todas (\(viewModel.totalPortsCount))").tag(PortFilterCategory.all)
                 Text("Dev (\(viewModel.devPortsCount))").tag(PortFilterCategory.dev)
@@ -263,6 +464,47 @@ public struct DashboardView: View {
             .pickerStyle(.segmented)
             .controlSize(.small)
             .fixedSize()
+
+            Divider()
+                .frame(height: 18)
+                .opacity(0.3)
+
+            // Manual Port Kill Field (Quick Kill :3000)
+            HStack(spacing: 4) {
+                Text(":")
+                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+
+                TextField("Porta", text: $manualPortInput)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .frame(width: 50)
+                    .onSubmit { executeManualKill() }
+
+                Button(action: executeManualKill) {
+                    HStack(spacing: 3) {
+                        if isExecutingManualKill {
+                            ProgressView()
+                                .controlSize(.mini)
+                        } else {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 9, weight: .bold))
+                            Text("Kill")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.red, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(manualPortInput.trimmingCharacters(in: .whitespaces).isEmpty || isExecutingManualKill)
+                .help("Terminar processo na porta introduzida (Enter)")
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -381,14 +623,19 @@ public struct DashboardView: View {
                 Button(role: .destructive, action: {
                     Task {
                         await viewModel.kill(port: port)
+                        showSuccess("Processo na porta :\(port.port) terminado.")
                     }
                 }) {
-                    Text("Kill")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.red)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    HStack(spacing: 2) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 8, weight: .bold))
+                        Text("Kill")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(.red)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.red.opacity(0.12), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
                 }
                 .buttonStyle(.plain)
                 .help("Terminar processo na porta \(port.port)")
@@ -404,6 +651,48 @@ public struct DashboardView: View {
         .contentShape(Rectangle())
         .onTapGesture {
             selectedPortId = port.id
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                Task {
+                    await viewModel.kill(port: port)
+                    showSuccess("Processo na porta :\(port.port) terminado.")
+                }
+            } label: {
+                Label("Terminar Processo (Kill :\(port.port))", systemImage: "xmark.circle")
+            }
+
+            Divider()
+
+            Button {
+                viewModel.openInBrowser(port: port.port)
+            } label: {
+                Label("Abrir no Browser (localhost:\(port.port))", systemImage: "arrow.up.right.square")
+            }
+
+            if let folder = port.workingDirectory {
+                Button {
+                    viewModel.openProjectFolder(path: folder)
+                } label: {
+                    Label("Revelar Pasta no Finder", systemImage: "folder")
+                }
+            }
+
+            Divider()
+
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(":\(port.port)", forType: .string)
+            } label: {
+                Label("Copiar Porta (:\(port.port))", systemImage: "doc.on.doc")
+            }
+
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString("\(port.pid)", forType: .string)
+            } label: {
+                Label("Copiar PID (\(port.pid))", systemImage: "number")
+            }
         }
     }
 
@@ -500,12 +789,13 @@ public struct DashboardView: View {
                 Button(role: .destructive, action: {
                     Task {
                         await viewModel.kill(port: port)
+                        showSuccess("Processo na porta :\(port.port) terminado.")
                     }
                 }) {
                     HStack {
                         Spacer()
                         Image(systemName: "xmark.circle.fill")
-                        Text("Terminar Processo na Porta :\(port.port)")
+                        Text("Terminar Processo na Porta :\(port.port) (⌘⌫)")
                             .font(.system(size: 12, weight: .semibold))
                         Spacer()
                     }
@@ -556,5 +846,65 @@ public struct DashboardView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
         .background(.thinMaterial)
+    }
+
+    // MARK: - Actions
+
+    private func killSelectedPort() {
+        guard let port = selectedPort else { return }
+        Task {
+            await viewModel.kill(port: port)
+            showSuccess("Processo na porta :\(port.port) terminado.")
+        }
+    }
+
+    private func executeManualKill() {
+        let trimmed = manualPortInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let portNumber = Int(trimmed), (1...65535).contains(portNumber) else {
+            viewModel.errorMessage = "Por favor introduza uma porta válida entre 1 e 65535."
+            return
+        }
+
+        Task {
+            isExecutingManualKill = true
+            defer { isExecutingManualKill = false }
+
+            let success = await viewModel.killPortNumber(portNumber)
+            if success {
+                manualPortInput = ""
+                showSuccess("Processo na porta :\(portNumber) terminado com sucesso.")
+            }
+        }
+    }
+
+    private func executeBatchKill(target: BatchKillType) {
+        Task {
+            let count: Int
+            switch target {
+            case .suggested:
+                count = await viewModel.killAll(category: .suggested)
+                showSuccess("\(count) \(count == 1 ? "porta sugerida terminada" : "portas sugeridas terminadas").")
+            case .dev:
+                count = await viewModel.killAll(category: .dev)
+                showSuccess("\(count) \(count == 1 ? "servidor dev terminado" : "servidores dev terminados").")
+            case .displayed:
+                count = await viewModel.killBatch(ports: displayedPorts)
+                showSuccess("\(count) \(count == 1 ? "porta terminada" : "portas terminadas").")
+            }
+        }
+    }
+
+    private func showSuccess(_ text: String) {
+        withAnimation(.snappy(duration: 0.15)) {
+            successBannerMessage = text
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(3))
+            if successBannerMessage == text {
+                withAnimation(.snappy(duration: 0.2)) {
+                    successBannerMessage = nil
+                }
+            }
+        }
     }
 }

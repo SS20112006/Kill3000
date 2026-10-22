@@ -301,6 +301,107 @@ final class PortListViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.errorMessage?.contains("protected") == true)
     }
 
+    @MainActor
+    func testKillPortNumberSuccess() async {
+        let terminator = MockProcessTerminator()
+        let viewModel = PortListViewModel(scanner: MockPortScanner(), terminator: terminator)
+        viewModel.ports = [devPort1, devPort2]
+
+        let result = await viewModel.killPortNumber(3000)
+
+        XCTAssertTrue(result)
+        XCTAssertEqual(terminator.terminatedPids, [101])
+        XCTAssertEqual(viewModel.ports.map(\.port), [5173])
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    @MainActor
+    func testKillPortNumberInvalidRange() async {
+        let terminator = MockProcessTerminator()
+        let viewModel = PortListViewModel(scanner: MockPortScanner(), terminator: terminator)
+
+        let resultZero = await viewModel.killPortNumber(0)
+        XCTAssertFalse(resultZero)
+        XCTAssertNotNil(viewModel.errorMessage)
+
+        let resultTooHigh = await viewModel.killPortNumber(70000)
+        XCTAssertFalse(resultTooHigh)
+        XCTAssertNotNil(viewModel.errorMessage)
+        XCTAssertTrue(terminator.terminatedPids.isEmpty)
+    }
+
+    @MainActor
+    func testKillPortNumberNotFound() async {
+        let scanner = MockPortScanner(stubbedPorts: [])
+        let terminator = MockProcessTerminator()
+        let viewModel = PortListViewModel(scanner: scanner, terminator: terminator)
+        viewModel.ports = [devPort1]
+
+        let result = await viewModel.killPortNumber(8080)
+
+        XCTAssertFalse(result)
+        XCTAssertEqual(viewModel.errorMessage, "Nenhum processo ativo encontrado na porta 8080.")
+        XCTAssertTrue(terminator.terminatedPids.isEmpty)
+    }
+
+    @MainActor
+    func testKillPortNumberTriggersScanWhenNotInMemory() async {
+        let scanner = MockPortScanner(stubbedPorts: [devPort1])
+        let terminator = MockProcessTerminator()
+        let viewModel = PortListViewModel(scanner: scanner, terminator: terminator)
+        // Memory currently empty
+        XCTAssertTrue(viewModel.ports.isEmpty)
+
+        let result = await viewModel.killPortNumber(3000)
+
+        XCTAssertTrue(result)
+        XCTAssertEqual(scanner.scanCallCount, 1)
+        XCTAssertEqual(terminator.terminatedPids, [101])
+        XCTAssertTrue(viewModel.ports.isEmpty)
+    }
+
+    @MainActor
+    func testKillBatchSuccess() async {
+        let terminator = MockProcessTerminator()
+        let viewModel = PortListViewModel(scanner: MockPortScanner(), terminator: terminator)
+        viewModel.ports = [devPort1, devPort2, sysPort1]
+
+        let count = await viewModel.killBatch(ports: [devPort1, devPort2])
+
+        XCTAssertEqual(count, 2)
+        XCTAssertEqual(terminator.terminatedPids, [101, 102])
+        XCTAssertEqual(viewModel.ports.map(\.port), [5353])
+    }
+
+    @MainActor
+    func testKillAllCategory() async {
+        let orphanDev = ActivePort(
+            port: 4000,
+            pid: 105,
+            processName: "node",
+            user: "dev",
+            protocols: ["IPv4"],
+            category: .development,
+            isOrphan: true,
+            recommendation: .recommended(reason: "Orphan")
+        )
+        let terminator = MockProcessTerminator()
+        let viewModel = PortListViewModel(scanner: MockPortScanner(), terminator: terminator)
+        viewModel.ports = [devPort1, devPort2, orphanDev, sysPort1]
+
+        // Kill only suggested
+        let suggestedCount = await viewModel.killAll(category: .suggested)
+        XCTAssertEqual(suggestedCount, 1)
+        XCTAssertEqual(terminator.terminatedPids, [105])
+        XCTAssertEqual(viewModel.ports.map(\.port), [3000, 5173, 5353])
+
+        // Kill all dev
+        let devCount = await viewModel.killAll(category: .dev)
+        XCTAssertEqual(devCount, 2)
+        XCTAssertEqual(terminator.terminatedPids, [105, 101, 102])
+        XCTAssertEqual(viewModel.ports.map(\.port), [5353])
+    }
+
     // MARK: - Open in Browser
     @MainActor
     func testOpenInBrowserSuccess() {
