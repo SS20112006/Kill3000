@@ -51,7 +51,7 @@ public struct PopoverContainerView: View {
             // Bottom Status / Metadata Bar
             footerView
         }
-        .frame(width: 384)
+        .frame(width: 420)
         .frame(minHeight: 260, maxHeight: 540)
         .background(.ultraThinMaterial)
         .sensoryFeedback(.selection, trigger: viewModel.showAllPorts)
@@ -228,6 +228,9 @@ public struct PopoverContainerView: View {
                                     Task {
                                         await viewModel.kill(port: portToKill)
                                     }
+                                },
+                                onOpenFolder: { folderPath in
+                                    viewModel.openProjectFolder(path: folderPath)
                                 }
                             )
                             .transition(.asymmetric(

@@ -336,4 +336,109 @@ final class PortListViewModelTests: XCTestCase {
         XCTAssertFalse(successTooHigh)
         XCTAssertTrue(recorder.openedURLs.isEmpty)
     }
+
+    // MARK: - Enhanced Search & Project Operations
+    @MainActor
+    func testFilteringByProjectName() {
+        let enrichedPort = ActivePort(
+            port: 3000,
+            pid: 101,
+            processName: "node",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .development,
+            projectOrAppName: "my-store-frontend"
+        )
+        let otherPort = ActivePort(
+            port: 5173,
+            pid: 102,
+            processName: "vite",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .development,
+            projectOrAppName: "admin-dashboard"
+        )
+
+        let viewModel = PortListViewModel(scanner: MockPortScanner(), terminator: MockProcessTerminator())
+        viewModel.ports = [enrichedPort, otherPort]
+
+        viewModel.searchText = "store"
+        XCTAssertEqual(viewModel.filteredPorts.map(\.port), [3000])
+
+        viewModel.searchText = "dashboard"
+        XCTAssertEqual(viewModel.filteredPorts.map(\.port), [5173])
+    }
+
+    @MainActor
+    func testFilteringByFramework() {
+        let nextPort = ActivePort(
+            port: 3000,
+            pid: 101,
+            processName: "node",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .development,
+            framework: "Next.js"
+        )
+        let djangoPort = ActivePort(
+            port: 8000,
+            pid: 102,
+            processName: "python3",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .development,
+            framework: "Django"
+        )
+
+        let viewModel = PortListViewModel(scanner: MockPortScanner(), terminator: MockProcessTerminator())
+        viewModel.ports = [nextPort, djangoPort]
+
+        viewModel.searchText = "next"
+        XCTAssertEqual(viewModel.filteredPorts.map(\.port), [3000])
+
+        viewModel.searchText = "django"
+        XCTAssertEqual(viewModel.filteredPorts.map(\.port), [8000])
+    }
+
+    @MainActor
+    func testFilteringByWorkingDirectory() {
+        let shopPort = ActivePort(
+            port: 3000,
+            pid: 101,
+            processName: "node",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .development,
+            workingDirectory: "/Users/dev/repos/shop"
+        )
+
+        let viewModel = PortListViewModel(scanner: MockPortScanner(), terminator: MockProcessTerminator())
+        viewModel.ports = [shopPort]
+
+        viewModel.searchText = "repos/shop"
+        XCTAssertEqual(viewModel.filteredPorts.map(\.port), [3000])
+    }
+
+    @MainActor
+    func testOpenProjectFolderSuccessAndFailure() {
+        let recorder = URLRecorder()
+        let viewModel = PortListViewModel(
+            scanner: MockPortScanner(),
+            terminator: MockProcessTerminator(),
+            folderOpener: { recorder.open($0) }
+        )
+
+        // Valid path
+        let success = viewModel.openProjectFolder(path: "/Users/dev/my-project")
+        XCTAssertTrue(success)
+        XCTAssertEqual(recorder.openedURLs.first?.path, "/Users/dev/my-project")
+
+        // Invalid empty path
+        let failEmpty = viewModel.openProjectFolder(path: "")
+        XCTAssertFalse(failEmpty)
+
+        // Invalid root path
+        let failRoot = viewModel.openProjectFolder(path: "/")
+        XCTAssertFalse(failRoot)
+    }
 }

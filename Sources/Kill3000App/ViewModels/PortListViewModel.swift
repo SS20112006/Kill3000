@@ -9,6 +9,7 @@ import Kill3000Engine
 @MainActor
 public final class PortListViewModel {
     public typealias URLOpener = @Sendable (URL) -> Bool
+    public typealias FolderOpener = @Sendable (URL) -> Bool
 
     /// Full list of active listening ports discovered on the system.
     public var ports: [ActivePort] = []
@@ -48,14 +49,18 @@ public final class PortListViewModel {
 
             let matchesPort = String(port.port).localizedCaseInsensitiveContains(trimmedQuery)
             let matchesProcess = port.processName.localizedCaseInsensitiveContains(trimmedQuery)
+            let matchesProject = port.projectOrAppName?.localizedCaseInsensitiveContains(trimmedQuery) ?? false
+            let matchesFramework = port.framework?.localizedCaseInsensitiveContains(trimmedQuery) ?? false
+            let matchesDir = port.workingDirectory?.localizedCaseInsensitiveContains(trimmedQuery) ?? false
 
-            return matchesPort || matchesProcess
+            return matchesPort || matchesProcess || matchesProject || matchesFramework || matchesDir
         }
     }
 
     private let scanner: any PortScanning
     private let terminator: any ProcessTerminating
     private let urlOpener: URLOpener
+    private let folderOpener: FolderOpener
     private let pollingInterval: Duration
 
     private final class PollingSession: @unchecked Sendable {
@@ -76,16 +81,22 @@ public final class PortListViewModel {
     ///   - terminator: Process termination engine (defaults to `ProcessTerminator()`).
     ///   - pollingInterval: Interval between automatic scans (defaults to 2 seconds).
     ///   - urlOpener: Closure for opening web URLs (defaults to `NSWorkspace.shared.open`).
+    ///   - folderOpener: Closure for opening project directory in Finder.
     public init(
         scanner: any PortScanning = PortScanner(),
         terminator: any ProcessTerminating = ProcessTerminator(),
         pollingInterval: Duration = .seconds(2),
-        urlOpener: @escaping URLOpener = { NSWorkspace.shared.open($0) }
+        urlOpener: @escaping URLOpener = { NSWorkspace.shared.open($0) },
+        folderOpener: @escaping FolderOpener = { url in
+            NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: url.path)
+            return true
+        }
     ) {
         self.scanner = scanner
         self.terminator = terminator
         self.pollingInterval = pollingInterval
         self.urlOpener = urlOpener
+        self.folderOpener = folderOpener
     }
 
     /// Performs a single asynchronous scan of active ports.
@@ -167,6 +178,19 @@ public final class PortListViewModel {
             return false
         }
         return urlOpener(url)
+    }
+
+    /// Opens the project working directory in Finder.
+    ///
+    /// - Parameter path: The file system path to open.
+    /// - Returns: `true` if opened successfully; `false` otherwise.
+    @discardableResult
+    public func openProjectFolder(path: String) -> Bool {
+        guard !path.isEmpty && path != "/" else {
+            return false
+        }
+        let url = URL(fileURLWithPath: path)
+        return folderOpener(url)
     }
 
     /// Sanitizes client-facing error strings, guaranteeing no internal filesystem paths or stack traces leak.

@@ -79,22 +79,24 @@ public struct CLIHandler: Sendable {
 
             // Print table header
             let header = String(
-                format: "%-7@ %-7@ %-16@ %-16@ %-12@ %@",
-                "PORT", "PID", "PROCESS", "USER", "PROTOCOLS", "CATEGORY"
+                format: "%-7@ %-7@ %-16@ %-24@ %-12@ %-10@ %-10@ %@",
+                "PORT", "PID", "PROCESS", "TITLE / APP", "CATEGORY", "UPTIME", "STATUS", "PROTOCOLS"
             )
             printOut(header)
-            printOut(String(repeating: "-", count: 75))
+            printOut(String(repeating: "-", count: 105))
 
             for port in ports {
                 let protoStr = port.protocols.sorted().joined(separator: ", ")
                 let row = String(
-                    format: "%-7d %-7d %-16@ %-16@ %-12@ %@",
+                    format: "%-7d %-7d %-16@ %-24@ %-12@ %-10@ %-10@ %@",
                     port.port,
                     port.pid,
                     port.processName,
-                    port.user,
-                    protoStr,
-                    port.category.rawValue
+                    port.displayTitle,
+                    port.category.rawValue,
+                    port.formattedUptime ?? "-",
+                    port.recommendation.badgeLabel,
+                    protoStr
                 )
                 printOut(row)
             }

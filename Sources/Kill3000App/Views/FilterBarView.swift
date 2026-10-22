@@ -32,7 +32,7 @@ public struct FilterBarView: View {
                     .padding(.leading, 8)
                     .accessibilityHidden(true)
 
-                TextField("Search port, PID, process...", text: $searchText)
+                TextField("Search port, process, project, framework...", text: $searchText)
                     .textFieldStyle(.plain)
                     .focused($isSearchFocused)
                     .font(.system(size: 12, weight: .regular, design: .default))

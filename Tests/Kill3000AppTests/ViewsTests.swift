@@ -102,6 +102,55 @@ final class ViewsTests: XCTestCase {
         XCTAssertEqual(row.port.processName, "rapportd")
     }
 
+    func testPortRowViewWithFolderAction() {
+        let devPort = ActivePort(
+            port: 3000,
+            pid: 1234,
+            processName: "node",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .development,
+            projectOrAppName: "my-shop",
+            workingDirectory: "/Users/developer/Projects/my-shop",
+            framework: "Next.js"
+        )
+
+        var openedFolder: String?
+        let row = PortRowView(
+            port: devPort,
+            onOpenInBrowser: { _ in },
+            onKill: { _ in },
+            onOpenFolder: { openedFolder = $0 }
+        )
+
+        XCTAssertNotNil(row.body)
+        XCTAssertEqual(row.port.workingDirectory, "/Users/developer/Projects/my-shop")
+        row.onOpenFolder?("/Users/developer/Projects/my-shop")
+        XCTAssertEqual(openedFolder, "/Users/developer/Projects/my-shop")
+    }
+
+    func testPortRowViewOrphanState() {
+        let orphanPort = ActivePort(
+            port: 5173,
+            pid: 9876,
+            processName: "vite",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .development,
+            isOrphan: true
+        )
+
+        let row = PortRowView(
+            port: orphanPort,
+            onOpenInBrowser: { _ in },
+            onKill: { _ in }
+        )
+
+        XCTAssertNotNil(row.body)
+        XCTAssertTrue(row.port.isOrphan)
+        XCTAssertTrue(row.port.recommendation.isRecommendedToKill)
+    }
+
     func testEmptyStateViewVariations() {
         let defaultEmptyState = EmptyStateView(isFiltered: false)
         XCTAssertFalse(defaultEmptyState.isFiltered)
