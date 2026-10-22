@@ -23,19 +23,19 @@ public struct FilterBarView: View {
     }
 
     public var body: some View {
-        VStack(spacing: 8) {
-            // Modern search input field with SF Symbol icon and clear button
+        HStack(spacing: 8) {
+            // Modern compact search input field with SF Symbol icon and clear button
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass")
-                    .font(.system(size: 13, weight: .medium, design: .default))
+                    .font(.system(size: 11, weight: .medium, design: .default))
                     .foregroundStyle(isSearchFocused ? .primary : .secondary)
-                    .padding(.leading, 10)
+                    .padding(.leading, 8)
                     .accessibilityHidden(true)
 
-                TextField("Search port or process...", text: $searchText)
+                TextField("Search port, PID, process...", text: $searchText)
                     .textFieldStyle(.plain)
                     .focused($isSearchFocused)
-                    .font(.system(size: 13, weight: .regular, design: .default))
+                    .font(.system(size: 12, weight: .regular, design: .default))
                     .tracking(0.1) // SF Pro Text optical tracking
                     .foregroundStyle(.primary)
                     .accessibilityLabel("Search active ports")
@@ -47,12 +47,12 @@ public struct FilterBarView: View {
                         }
                     }) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.secondary)
-                            .padding(.trailing, 8)
+                            .padding(.trailing, 6)
                     }
                     .buttonStyle(.plain)
-                    .frame(minWidth: 44, minHeight: 34) // 44pt touch footprint
+                    .frame(minWidth: 28, minHeight: 28)
                     .contentShape(Rectangle())
                     .help("Clear search text")
                     .accessibilityLabel("Clear search")
@@ -62,10 +62,10 @@ public struct FilterBarView: View {
                         .frame(width: 4)
                 }
             }
-            .frame(height: 34)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .frame(height: 28)
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
                     .strokeBorder(
                         isSearchFocused ? Color.accentColor.opacity(0.45) : Color.primary.opacity(0.1),
                         lineWidth: 1
@@ -73,22 +73,24 @@ public struct FilterBarView: View {
             )
             .animation(.snappy(duration: 0.18), value: isSearchFocused)
 
-            // Segmented picker for category filtering with live counters
+            // Segmented picker for category filtering with live counters inline
             Picker("Port Category", selection: $showAllPorts) {
                 if devCount > 0 || totalCount > 0 {
                     Text("Dev (\(devCount))").tag(false)
                     Text("All (\(totalCount))").tag(true)
                 } else {
-                    Text("Dev Servers").tag(false)
-                    Text("All Ports").tag(true)
+                    Text("Dev").tag(false)
+                    Text("All").tag(true)
                 }
             }
             .pickerStyle(.segmented)
             .labelsHidden()
-            .controlSize(.regular)
+            .controlSize(.small)
+            .fixedSize()
             .accessibilityLabel("Filter by port category")
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 14)
+        .padding(.top, 2)
+        .padding(.bottom, 6)
     }
 }

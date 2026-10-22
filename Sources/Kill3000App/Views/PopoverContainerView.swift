@@ -3,8 +3,7 @@ import Kill3000Engine
 
 /// Root popover container view displayed in the macOS MenuBarExtra.
 /// Implements Apple Human Interface Guidelines:
-/// - SF Pro Display (>= 20pt) with optical negative tracking for title.
-/// - SF Pro Text (<= 19pt) with positive tracking for legibility.
+/// - SF Pro Text (<= 19pt) with positive optical tracking for compact title and controls.
 /// - Native macOS `.ultraThinMaterial` translucency and semantic materials.
 /// - 44x44pt minimum touch target footprints for all interactive elements.
 /// - WCAG AA compliant contrast (>= 4.5:1).
@@ -53,7 +52,7 @@ public struct PopoverContainerView: View {
             footerView
         }
         .frame(width: 384)
-        .frame(minHeight: 240, maxHeight: 520)
+        .frame(minHeight: 260, maxHeight: 540)
         .background(.ultraThinMaterial)
         .sensoryFeedback(.selection, trigger: viewModel.showAllPorts)
         .sensoryFeedback(.impact(weight: .medium), trigger: viewModel.ports.count) { old, new in
@@ -82,17 +81,17 @@ public struct PopoverContainerView: View {
     // MARK: - Subviews
 
     private var headerView: some View {
-        HStack(alignment: .center, spacing: 8) {
-            HStack(spacing: 7) {
+        HStack(alignment: .center, spacing: 6) {
+            HStack(spacing: 6) {
                 Image(systemName: "network.badge.shield.half.filled")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.tint)
                     .accessibilityHidden(true)
 
-                // Header >= 20pt: SF Pro Display with optical tracking (-0.4)
+                // Compact Header <= 19pt: SF Pro Text with optical tracking (0.1)
                 Text("Kill3000")
-                    .font(.system(size: 20, weight: .bold, design: .default))
-                    .tracking(-0.4)
+                    .font(.system(size: 14, weight: .bold, design: .default))
+                    .tracking(0.1)
                     .foregroundStyle(.primary)
             }
 
@@ -107,14 +106,14 @@ public struct PopoverContainerView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(isRefreshHovered ? Color.primary.opacity(0.08) : Color.clear)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 26, height: 26)
 
                     if viewModel.isLoading {
                         ProgressView()
-                            .controlSize(.small)
+                            .controlSize(.mini)
                     } else {
                         Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(isRefreshHovered ? .primary : .secondary)
                     }
                 }
@@ -138,10 +137,10 @@ public struct PopoverContainerView: View {
                 ZStack {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .fill(isQuitHovered ? Color.primary.opacity(0.08) : Color.clear)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 26, height: 26)
 
                     Image(systemName: "power")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(isQuitHovered ? .primary : .secondary)
                 }
             }
@@ -157,9 +156,9 @@ public struct PopoverContainerView: View {
             .help("Quit Kill3000 (⌘Q)")
             .accessibilityLabel("Quit Kill3000")
         }
-        .padding(.horizontal, 16)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
+        .padding(.horizontal, 14)
+        .padding(.top, 4)
+        .padding(.bottom, 2)
     }
 
     private func errorBanner(message: String) -> some View {
@@ -271,7 +270,7 @@ public struct PopoverContainerView: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        .padding(.vertical, 6)
         .background(.thinMaterial)
     }
 }
