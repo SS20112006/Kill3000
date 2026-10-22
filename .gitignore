@@ -1,0 +1,24 @@
+# .gitignore for Kill3000 (macOS / Swift)
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode & Swift Package Manager
+build/
+DerivedData/
+*.xcodeproj
+*.xcworkspace
+!default.sublime-project
+*.xcuserstate
+project.xcworkspace/
+xcuserdata/
+.build/
+Packages/
+*.swp
+*.lock
+*.resolved
+
+# Fastlane / CI
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
