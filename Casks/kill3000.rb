@@ -2,10 +2,10 @@ cask "kill3000" do
   version "1.0.0"
   sha256 :no_check
 
-  url "https://github.com/simao-sousa/Kill3000/releases/download/v#{version}/Kill3000.zip"
+  url "https://github.com/SS20112006/Kill3000/releases/download/v#{version}/Kill3000.zip"
   name "Kill3000"
   desc "Lightweight native macOS menu bar app to inspect and terminate local development servers"
-  homepage "https://github.com/simao-sousa/Kill3000"
+  homepage "https://github.com/SS20112006/Kill3000"
 
   depends_on macos: ">= :sonoma"
 

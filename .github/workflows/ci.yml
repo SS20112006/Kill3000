@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build, Test & Package
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Swift Package Manager dependencies and build cache
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('**/Package.resolved', 'Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      - name: Run unit and integration tests with code coverage
+        run: swift test --enable-code-coverage
+
+      - name: Build macOS application bundle and sign ad-hoc
+        run: |
+          chmod +x scripts/build-app.sh
+          ./scripts/build-app.sh
+
+      - name: Execute end-to-end smoke test harness
+        run: |
+          chmod +x scripts/smoke-test.sh
+          ./scripts/smoke-test.sh
+
+      - name: Upload Kill3000 application zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kill3000-macOS-v1.0.0
+          path: build/Kill3000.zip
+          if-no-files-found: error
