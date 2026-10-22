@@ -11,12 +11,14 @@ import Kill3000Engine
 /// - Direct actions: Manual port kill, batch termination, contextual menus, and keyboard shortcuts (⌘K, ⌘⌫).
 public struct DashboardView: View {
     public enum BatchKillType: Identifiable, Sendable {
+        case myPorts
         case dev
         case suggested
         case displayed
 
         public var id: String {
             switch self {
+            case .myPorts: return "myPorts"
             case .dev: return "dev"
             case .suggested: return "suggested"
             case .displayed: return "displayed"
@@ -114,6 +116,8 @@ public struct DashboardView: View {
             Button("Cancelar", role: .cancel) {}
         } message: { target in
             switch target {
+            case .myPorts:
+                Text("Tem a certeza de que deseja encerrar as \(viewModel.myPortsCount) portas criadas por si?")
             case .suggested:
                 Text("Tem a certeza de que deseja encerrar as \(viewModel.suggestedPortsCount) portas recomendadas a fechar?")
             case .dev:
@@ -155,6 +159,8 @@ public struct DashboardView: View {
         return viewModel.ports.filter { port in
             // Category filter
             switch dashboardCategory {
+            case .myPorts:
+                if !port.isUserCreated { return false }
             case .dev:
                 if port.category != .development { return false }
             case .suggested:
@@ -195,6 +201,14 @@ public struct DashboardView: View {
 
                 // Batch Kill Menu
                 Menu {
+                    Button(role: .destructive) {
+                        batchKillTarget = .myPorts
+                        showBatchConfirmation = true
+                    } label: {
+                        Label("Kill Minhas Portas (\(viewModel.myPortsCount))", systemImage: "person.crop.circle.badge.xmark")
+                    }
+                    .disabled(viewModel.myPortsCount == 0)
+
                     Button(role: .destructive) {
                         batchKillTarget = .suggested
                         showBatchConfirmation = true
@@ -262,22 +276,22 @@ public struct DashboardView: View {
                 .help("Atualizar lista de portas (⌘R)")
             }
 
-            // 4 KPI Summary Cards
-            HStack(spacing: 12) {
+            // 5 KPI Summary Cards
+            HStack(spacing: 10) {
                 metricCard(
-                    title: "Portas Ativas",
-                    count: viewModel.totalPortsCount,
-                    icon: "network",
-                    color: .primary,
-                    isSelected: dashboardCategory == .all,
-                    action: { dashboardCategory = .all }
+                    title: "Minhas Portas",
+                    count: viewModel.myPortsCount,
+                    icon: "person.crop.circle.fill",
+                    color: .accentColor,
+                    isSelected: dashboardCategory == .myPorts,
+                    action: { dashboardCategory = .myPorts }
                 )
 
                 metricCard(
                     title: "Servidores Dev",
                     count: viewModel.devPortsCount,
                     icon: "hammer.fill",
-                    color: .accentColor,
+                    color: .indigo,
                     isSelected: dashboardCategory == .dev,
                     action: { dashboardCategory = .dev }
                 )
@@ -290,6 +304,15 @@ public struct DashboardView: View {
                     isSelected: dashboardCategory == .suggested,
                     highlight: viewModel.suggestedPortsCount > 0,
                     action: { dashboardCategory = .suggested }
+                )
+
+                metricCard(
+                    title: "Portas Ativas",
+                    count: viewModel.totalPortsCount,
+                    icon: "network",
+                    color: .primary,
+                    isSelected: dashboardCategory == .all,
+                    action: { dashboardCategory = .all }
                 )
 
                 metricCard(
@@ -457,9 +480,10 @@ public struct DashboardView: View {
 
             // Category Segmented Control
             Picker("Filtro", selection: $dashboardCategory) {
-                Text("Todas (\(viewModel.totalPortsCount))").tag(PortFilterCategory.all)
+                Text("Minhas (\(viewModel.myPortsCount))").tag(PortFilterCategory.myPorts)
                 Text("Dev (\(viewModel.devPortsCount))").tag(PortFilterCategory.dev)
                 Text("Sugeridas (\(viewModel.suggestedPortsCount))").tag(PortFilterCategory.suggested)
+                Text("Todas (\(viewModel.totalPortsCount))").tag(PortFilterCategory.all)
             }
             .pickerStyle(.segmented)
             .controlSize(.small)
@@ -712,6 +736,13 @@ public struct DashboardView: View {
                 .padding(.horizontal, 5)
                 .padding(.vertical, 1.5)
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+        } else if port.isUserCreated {
+            Text("Minha")
+                .font(.system(size: 9, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 1.5)
+                .background(Color.accentColor.opacity(0.14), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
         } else {
             Text("Ativo")
                 .font(.system(size: 9, weight: .medium))
@@ -881,6 +912,9 @@ public struct DashboardView: View {
         Task {
             let count: Int
             switch target {
+            case .myPorts:
+                count = await viewModel.killAll(category: .myPorts)
+                showSuccess("\(count) \(count == 1 ? "porta sua terminada" : "portas suas terminadas").")
             case .suggested:
                 count = await viewModel.killAll(category: .suggested)
                 showSuccess("\(count) \(count == 1 ? "porta sugerida terminada" : "portas sugeridas terminadas").")

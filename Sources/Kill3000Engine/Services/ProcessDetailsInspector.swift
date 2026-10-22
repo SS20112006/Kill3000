@@ -18,6 +18,7 @@ public struct ProcessEnrichmentData: Sendable, Equatable {
     public let parentPid: pid_t?
     public let isOrphan: Bool
     public let recommendation: KillRecommendation
+    public let isUserCreated: Bool
 
     public init(
         commandPath: String? = nil,
@@ -28,7 +29,8 @@ public struct ProcessEnrichmentData: Sendable, Equatable {
         uptimeSeconds: TimeInterval? = nil,
         parentPid: pid_t? = nil,
         isOrphan: Bool = false,
-        recommendation: KillRecommendation
+        recommendation: KillRecommendation,
+        isUserCreated: Bool = true
     ) {
         self.commandPath = commandPath
         self.projectOrAppName = projectOrAppName
@@ -39,6 +41,7 @@ public struct ProcessEnrichmentData: Sendable, Equatable {
         self.parentPid = parentPid
         self.isOrphan = isOrphan
         self.recommendation = recommendation
+        self.isUserCreated = isUserCreated
     }
 }
 
@@ -77,7 +80,8 @@ public struct ProcessDetailsInspector: ProcessEnriching, Sendable {
                 pid: port.pid,
                 port: port.port,
                 processName: port.processName,
-                category: port.category
+                category: port.category,
+                user: port.user
             )
 
             return ActivePort(
@@ -95,7 +99,8 @@ public struct ProcessDetailsInspector: ProcessEnriching, Sendable {
                 uptimeSeconds: details.uptimeSeconds ?? port.uptimeSeconds,
                 parentPid: details.parentPid ?? port.parentPid,
                 isOrphan: details.isOrphan,
-                recommendation: details.recommendation
+                recommendation: details.recommendation,
+                isUserCreated: details.isUserCreated
             )
         }
     }
@@ -105,7 +110,8 @@ public struct ProcessDetailsInspector: ProcessEnriching, Sendable {
         pid: pid_t,
         port: Int,
         processName: String,
-        category: ProcessCategory
+        category: ProcessCategory,
+        user: String = ""
     ) -> ProcessEnrichmentData {
         let execPath = getExecutablePath(pid: pid)
         let cwd = getWorkingDirectory(pid: pid)
@@ -127,13 +133,25 @@ public struct ProcessDetailsInspector: ProcessEnriching, Sendable {
         let parentPid = bsdInfo?.ppid
         let uptime = bsdInfo?.uptime
 
+        let isAppBundle = appName != nil || execPath?.contains(".app/") == true
+
         let (isOrphan, recommendation) = evaluateRecommendation(
             pid: pid,
             parentPid: parentPid,
             processName: processName,
             category: category,
             uptime: uptime,
-            isAppBundle: appName != nil
+            isAppBundle: isAppBundle
+        )
+
+        let isUserCreated = Self.isUserCreatedProcess(
+            category: category,
+            user: user,
+            execPath: execPath,
+            workingDirectory: cwd,
+            commandArgs: commandString,
+            isAppBundle: isAppBundle,
+            processName: processName
         )
 
         return ProcessEnrichmentData(
@@ -145,8 +163,61 @@ public struct ProcessDetailsInspector: ProcessEnriching, Sendable {
             uptimeSeconds: uptime,
             parentPid: parentPid,
             isOrphan: isOrphan,
-            recommendation: recommendation
+            recommendation: recommendation,
+            isUserCreated: isUserCreated
         )
+    }
+
+    /// Determines whether a process was spawned by the user (development server, CLI script, local project)
+    /// rather than a macOS system daemon or bundled desktop application.
+    public static func isUserCreatedProcess(
+        category: ProcessCategory,
+        user: String,
+        execPath: String?,
+        workingDirectory: String?,
+        commandArgs: String?,
+        isAppBundle: Bool,
+        processName: String
+    ) -> Bool {
+        if category == .systemDaemon {
+            return false
+        }
+
+        let currentUsername = ProcessInfo.processInfo.userName
+        let normalizedUser = user.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if !currentUsername.isEmpty && !normalizedUser.isEmpty &&
+           normalizedUser != currentUsername.lowercased() &&
+           normalizedUser != "developer" {
+            return false
+        }
+
+        if let path = execPath?.lowercased() {
+            if path.hasPrefix("/system/") ||
+               path.hasPrefix("/usr/libexec/") ||
+               path.hasPrefix("/usr/sbin/") {
+                return false
+            }
+        }
+
+        let normalizedProc = processName.lowercased()
+        if normalizedProc.contains("docker-proxy") || normalizedProc.contains("docker-pr") {
+            return true
+        }
+
+        if isAppBundle {
+            let isAppInApplications = (execPath?.contains("/Applications/") == true) ||
+                                      (execPath?.contains("/System/") == true) ||
+                                      (commandArgs?.contains("/Applications/") == true)
+            if isAppInApplications {
+                return false
+            }
+        }
+
+        if let path = execPath, path.hasPrefix("/Applications/") {
+            return false
+        }
+
+        return true
     }
 
     // MARK: - Native Darwin Kernel Inspections

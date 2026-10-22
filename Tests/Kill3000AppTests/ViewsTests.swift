@@ -243,13 +243,57 @@ final class ViewsTests: XCTestCase {
     }
 
     func testDashboardViewBatchKillTypeIdentifiers() {
+        let myPorts = DashboardView.BatchKillType.myPorts
         let dev = DashboardView.BatchKillType.dev
         let suggested = DashboardView.BatchKillType.suggested
         let displayed = DashboardView.BatchKillType.displayed
 
+        XCTAssertEqual(myPorts.id, "myPorts")
         XCTAssertEqual(dev.id, "dev")
         XCTAssertEqual(suggested.id, "suggested")
         XCTAssertEqual(displayed.id, "displayed")
+    }
+
+    func testFilterBarViewWithMyPortsCategoryBinding() {
+        var category = PortFilterCategory.myPorts
+        var searchText = ""
+
+        let filterBar = FilterBarView(
+            searchText: Binding(get: { searchText }, set: { searchText = $0 }),
+            filterCategory: Binding(get: { category }, set: { category = $0 }),
+            myPortsCount: 2,
+            devCount: 4,
+            suggestedCount: 1,
+            totalCount: 8
+        )
+
+        XCTAssertNotNil(filterBar.body)
+        XCTAssertEqual(filterBar.myPortsCount, 2)
+        XCTAssertEqual(filterBar.devCount, 4)
+        XCTAssertEqual(filterBar.suggestedCount, 1)
+        XCTAssertEqual(filterBar.totalCount, 8)
+        XCTAssertFalse(filterBar.showAllPorts)
+    }
+
+    func testPortRowViewUserCreatedBadge() {
+        let userPort = ActivePort(
+            port: 3000,
+            pid: 101,
+            processName: "node",
+            user: "dev",
+            protocols: ["IPv4"],
+            category: .development,
+            isUserCreated: true
+        )
+
+        let row = PortRowView(
+            port: userPort,
+            onOpenInBrowser: { _ in },
+            onKill: { _ in }
+        )
+
+        XCTAssertNotNil(row.body)
+        XCTAssertTrue(row.port.isUserCreated)
     }
 
     func testDashboardViewWithErrorMessageRendersBanner() {

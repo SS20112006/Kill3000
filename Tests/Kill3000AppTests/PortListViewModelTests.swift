@@ -604,4 +604,93 @@ final class PortListViewModelTests: XCTestCase {
         viewModel.showAllPorts = true
         XCTAssertEqual(viewModel.filterCategory, .all)
     }
+
+    @MainActor
+    func testFilterCategoryMyPortsAndCounters() {
+        let userCreatedDevPort = ActivePort(
+            port: 3000,
+            pid: 101,
+            processName: "node",
+            commandPath: "/usr/local/bin/node",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .development,
+            isUserCreated: true
+        )
+        let backgroundAppPort = ActivePort(
+            port: 83285,
+            pid: 888,
+            processName: "Spotify",
+            commandPath: "/Applications/Spotify.app/Contents/MacOS/Spotify",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .development,
+            isUserCreated: false
+        )
+        let systemPort = ActivePort(
+            port: 5000,
+            pid: 103,
+            processName: "ControlCenter",
+            commandPath: "/System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter",
+            user: "root",
+            protocols: ["IPv4"],
+            category: .systemDaemon,
+            isUserCreated: false
+        )
+
+        let viewModel = PortListViewModel(scanner: MockPortScanner(), terminator: MockProcessTerminator())
+        viewModel.ports = [userCreatedDevPort, backgroundAppPort, systemPort]
+
+        XCTAssertEqual(viewModel.totalPortsCount, 3)
+        XCTAssertEqual(viewModel.devPortsCount, 2)
+        XCTAssertEqual(viewModel.myPortsCount, 1)
+
+        // Filter by .myPorts
+        viewModel.filterCategory = .myPorts
+        XCTAssertEqual(viewModel.filteredPorts.map(\.port), [3000])
+
+        // Filter by .dev
+        viewModel.filterCategory = .dev
+        XCTAssertEqual(viewModel.filteredPorts.map(\.port), [3000, 83285])
+    }
+
+    @MainActor
+    func testKillAllMyPortsCategory() async {
+        let userPort1 = ActivePort(
+            port: 3000,
+            pid: 101,
+            processName: "node",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .development,
+            isUserCreated: true
+        )
+        let userPort2 = ActivePort(
+            port: 5173,
+            pid: 102,
+            processName: "vite",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .development,
+            isUserCreated: true
+        )
+        let backgroundAppPort = ActivePort(
+            port: 7768,
+            pid: 103,
+            processName: "Spotify",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .development,
+            isUserCreated: false
+        )
+
+        let terminator = MockProcessTerminator()
+        let viewModel = PortListViewModel(scanner: MockPortScanner(), terminator: terminator)
+        viewModel.ports = [userPort1, userPort2, backgroundAppPort]
+
+        let count = await viewModel.killAll(category: .myPorts)
+        XCTAssertEqual(count, 2)
+        XCTAssertEqual(terminator.terminatedPids, [101, 102])
+        XCTAssertEqual(viewModel.ports.map(\.port), [7768])
+    }
 }

@@ -224,4 +224,54 @@ final class ProcessDetailsInspectorTests: XCTestCase {
         // Folder name is part of displayTitle ("Vite • web-client"), so subtitle avoids repeating it!
         XCTAssertEqual(portWithSameFolderAsProject.compactSubtitle, "PID 5678 • 2m")
     }
+
+    func testUserCreatedClassificationForCLIvsAppBundle() {
+        // 1. Standard Node dev server in user folder
+        let isNodeUserCreated = ProcessDetailsInspector.isUserCreatedProcess(
+            category: .development,
+            user: "developer",
+            execPath: "/usr/local/bin/node",
+            workingDirectory: "/Users/developer/my-site",
+            commandArgs: "node server.js",
+            isAppBundle: false,
+            processName: "node"
+        )
+        XCTAssertTrue(isNodeUserCreated)
+
+        // 2. Packaged desktop app bundle (Spotify)
+        let isSpotifyUserCreated = ProcessDetailsInspector.isUserCreatedProcess(
+            category: .development,
+            user: "developer",
+            execPath: "/Applications/Spotify.app/Contents/MacOS/Spotify",
+            workingDirectory: "/",
+            commandArgs: nil,
+            isAppBundle: true,
+            processName: "Spotify"
+        )
+        XCTAssertFalse(isSpotifyUserCreated)
+
+        // 3. Stremio node daemon inside /Applications
+        let isStremioUserCreated = ProcessDetailsInspector.isUserCreatedProcess(
+            category: .development,
+            user: "developer",
+            execPath: "/Applications/Stremio.app/Contents/MacOS/node",
+            workingDirectory: "/",
+            commandArgs: "/Applications/Stremio.app/Contents/Resources/server.js",
+            isAppBundle: true,
+            processName: "node"
+        )
+        XCTAssertFalse(isStremioUserCreated)
+
+        // 4. macOS system service
+        let isSystemUserCreated = ProcessDetailsInspector.isUserCreatedProcess(
+            category: .systemDaemon,
+            user: "root",
+            execPath: "/usr/libexec/rapportd",
+            workingDirectory: nil,
+            commandArgs: nil,
+            isAppBundle: false,
+            processName: "rapportd"
+        )
+        XCTAssertFalse(isSystemUserCreated)
+    }
 }

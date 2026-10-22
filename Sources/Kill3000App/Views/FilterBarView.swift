@@ -8,16 +8,18 @@ public struct FilterBarView: View {
     private var customCategoryBinding: Binding<PortFilterCategory>?
     private var legacyShowAllPorts: Binding<Bool>?
 
+    public let myPortsCount: Int
     public let devCount: Int
     public let suggestedCount: Int
     public let totalCount: Int
 
     @FocusState private var isSearchFocused: Bool
 
-    /// Modern initializer using `PortFilterCategory` (.dev, .suggested, .all).
+    /// Modern initializer using `PortFilterCategory` (.myPorts, .dev, .suggested, .all).
     public init(
         searchText: Binding<String>,
         filterCategory: Binding<PortFilterCategory>,
+        myPortsCount: Int = 0,
         devCount: Int = 0,
         suggestedCount: Int = 0,
         totalCount: Int = 0
@@ -25,9 +27,28 @@ public struct FilterBarView: View {
         self._searchText = searchText
         self.customCategoryBinding = filterCategory
         self.legacyShowAllPorts = nil
+        self.myPortsCount = myPortsCount
         self.devCount = devCount
         self.suggestedCount = suggestedCount
         self.totalCount = totalCount
+    }
+
+    /// Convenience initializer without `myPortsCount` for backward compatibility.
+    public init(
+        searchText: Binding<String>,
+        filterCategory: Binding<PortFilterCategory>,
+        devCount: Int,
+        suggestedCount: Int,
+        totalCount: Int
+    ) {
+        self.init(
+            searchText: searchText,
+            filterCategory: filterCategory,
+            myPortsCount: 0,
+            devCount: devCount,
+            suggestedCount: suggestedCount,
+            totalCount: totalCount
+        )
     }
 
     /// Legacy compatibility initializer using `showAllPorts: Binding<Bool>`.
@@ -40,6 +61,7 @@ public struct FilterBarView: View {
         self._searchText = searchText
         self.customCategoryBinding = nil
         self.legacyShowAllPorts = showAllPorts
+        self.myPortsCount = 0
         self.devCount = devCount
         self.suggestedCount = 0
         self.totalCount = totalCount
@@ -116,6 +138,7 @@ public struct FilterBarView: View {
 
             // Segmented picker for category filtering with live counters inline
             Picker("Categoria", selection: activeCategoryBinding) {
+                Text("Minhas (\(myPortsCount))").tag(PortFilterCategory.myPorts)
                 Text("Dev (\(devCount))").tag(PortFilterCategory.dev)
                 if suggestedCount > 0 {
                     Text("Sugeridas (\(suggestedCount))").tag(PortFilterCategory.suggested)

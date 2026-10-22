@@ -275,6 +275,24 @@ public struct PortRowView: View {
                 .background(Color.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
                 .fixedSize()
                 .help("Base de dados ou serviço em background")
+        } else if port.isUserCreated {
+            Text("Minha")
+                .font(.system(size: 9, weight: .semibold, design: .default))
+                .foregroundStyle(Color.accentColor)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .fixedSize()
+                .help("Porta de desenvolvimento criada diretamente por si")
+        } else {
+            Text("Ativo")
+                .font(.system(size: 9, weight: .medium, design: .default))
+                .foregroundStyle(.green)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(Color.green.opacity(0.12), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                .fixedSize()
+                .help("Processo em execução")
         }
     }
 

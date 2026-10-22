@@ -53,6 +53,10 @@ public struct ActivePort: Identifiable, Sendable, Equatable, Hashable, Codable {
     /// Actionable recommendation on whether to terminate or preserve this process.
     public let recommendation: KillRecommendation
 
+    /// Indicates whether this port was spawned directly by the user (local dev server, CLI script, or project)
+    /// rather than a macOS system daemon or background desktop application bundle (.app).
+    public let isUserCreated: Bool
+
     public init(
         port: Int,
         pid: pid_t,
@@ -68,7 +72,8 @@ public struct ActivePort: Identifiable, Sendable, Equatable, Hashable, Codable {
         uptimeSeconds: TimeInterval? = nil,
         parentPid: pid_t? = nil,
         isOrphan: Bool = false,
-        recommendation: KillRecommendation? = nil
+        recommendation: KillRecommendation? = nil,
+        isUserCreated: Bool? = nil
     ) {
         self.port = port
         self.pid = pid
@@ -84,6 +89,15 @@ public struct ActivePort: Identifiable, Sendable, Equatable, Hashable, Codable {
         self.uptimeSeconds = uptimeSeconds
         self.parentPid = parentPid
         self.isOrphan = isOrphan
+
+        if let explicit = isUserCreated {
+            self.isUserCreated = explicit
+        } else {
+            let isApp = (commandPath?.contains(".app/") == true) ||
+                        (commandPath?.hasPrefix("/Applications/") == true) ||
+                        (workingDirectory?.contains(".app/") == true)
+            self.isUserCreated = (category == .development) && !isApp
+        }
 
         if let explicitRecommendation = recommendation {
             self.recommendation = explicitRecommendation

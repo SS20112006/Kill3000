@@ -34,10 +34,11 @@ public struct PopoverContainerView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            // Search and Category Filter (Dev, Sugeridas, Todas)
+            // Search and Category Filter (Minhas, Dev, Sugeridas, Todas)
             FilterBarView(
                 searchText: $viewModel.searchText,
                 filterCategory: $viewModel.filterCategory,
+                myPortsCount: viewModel.myPortsCount,
                 devCount: viewModel.devPortsCount,
                 suggestedCount: viewModel.suggestedPortsCount,
                 totalCount: viewModel.totalPortsCount

@@ -5,6 +5,7 @@ import Kill3000Engine
 
 /// Filter categories for active listening ports.
 public enum PortFilterCategory: String, Sendable, CaseIterable, Identifiable {
+    case myPorts = "Minhas"
     case dev = "Dev"
     case suggested = "Sugeridas"
     case all = "Todas"
@@ -48,6 +49,11 @@ public final class PortListViewModel {
         session.task != nil && !(session.task?.isCancelled ?? true)
     }
 
+    /// Count of ports created directly by the user (local projects and dev servers).
+    public var myPortsCount: Int {
+        ports.filter { $0.isUserCreated }.count
+    }
+
     /// Count of development servers.
     public var devPortsCount: Int {
         ports.filter { $0.category == .development }.count
@@ -68,8 +74,12 @@ public final class PortListViewModel {
         let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         return ports.filter { port in
-            // Category filter: Dev, Sugeridas, or Todas
+            // Category filter: Minhas, Dev, Sugeridas, or Todas
             switch filterCategory {
+            case .myPorts:
+                if !port.isUserCreated {
+                    return false
+                }
             case .dev:
                 if port.category != .development {
                     return false
@@ -286,12 +296,14 @@ public final class PortListViewModel {
 
     /// Asynchronously terminates all ports matching the given category.
     ///
-    /// - Parameter category: The filter category (.dev, .suggested, or .all).
+    /// - Parameter category: The filter category (.myPorts, .dev, .suggested, or .all).
     /// - Returns: The number of processes successfully terminated.
     @discardableResult
     public func killAll(category: PortFilterCategory) async -> Int {
         let targets: [ActivePort]
         switch category {
+        case .myPorts:
+            targets = ports.filter { $0.isUserCreated }
         case .dev:
             targets = ports.filter { $0.category == .development }
         case .suggested:
