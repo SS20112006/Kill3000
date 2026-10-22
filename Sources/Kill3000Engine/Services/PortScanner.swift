@@ -5,7 +5,8 @@ public protocol PortScanning: Sendable {
     func scan() async throws -> [ActivePort]
 }
 
-/// Actor responsible for asynchronously inspecting listening TCP ports via macOS `lsof`.
+/// Actor responsible for asynchronously inspecting listening TCP ports via macOS `lsof`
+/// and enriching them with process details, project identification, uptime, and cleanup safety.
 ///
 /// Executes the process off the Swift Concurrency cooperative thread pool to guarantee
 /// non-blocking I/O and zero latency spikes on the `@MainActor`.
@@ -13,26 +14,40 @@ public actor PortScanner: PortScanning {
     public typealias CommandRunner = @Sendable () async throws -> String
 
     private let runner: CommandRunner
+    private let enricher: any ProcessEnriching
 
     /// Initializes a `PortScanner` pointing to the system's `lsof` utility.
-    /// - Parameter lsofPath: Path to the `lsof` executable. Defaults to `/usr/sbin/lsof`.
-    public init(lsofPath: String = "/usr/sbin/lsof") {
-        self.init(runner: {
-            try await Self.runLsof(executablePath: lsofPath)
-        })
+    /// - Parameters:
+    ///   - lsofPath: Path to the `lsof` executable. Defaults to `/usr/sbin/lsof`.
+    ///   - enricher: Service enriching ports with process metadata and recommendations.
+    public init(
+        lsofPath: String = "/usr/sbin/lsof",
+        enricher: any ProcessEnriching = ProcessDetailsInspector()
+    ) {
+        self.init(
+            runner: {
+                try await Self.runLsof(executablePath: lsofPath)
+            },
+            enricher: enricher
+        )
     }
 
-    /// Internal initializer allowing command runner injection for testing.
-    internal init(runner: @escaping CommandRunner) {
+    /// Internal initializer allowing command runner and enricher injection for testing.
+    internal init(
+        runner: @escaping CommandRunner,
+        enricher: any ProcessEnriching = ProcessDetailsInspector()
+    ) {
         self.runner = runner
+        self.enricher = enricher
     }
 
-    /// Asynchronously executes the port scan and returns detected active ports.
+    /// Asynchronously executes the port scan, parses outputs, and enriches records.
     ///
-    /// - Returns: A list of `ActivePort` records deduplicated and sorted ascending by port.
+    /// - Returns: A list of enriched `ActivePort` records deduplicated and sorted ascending by port.
     public func scan() async throws -> [ActivePort] {
         let output = try await runner()
-        return PortParser.parse(output)
+        let parsed = PortParser.parse(output)
+        return await enricher.enrich(ports: parsed)
     }
 
     /// Executes `lsof` off the Swift Concurrency cooperative thread pool.
