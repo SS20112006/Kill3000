@@ -22,6 +22,32 @@ final class ViewsTests: XCTestCase {
         XCTAssertNotNil(filterBar.body)
         XCTAssertEqual(filterBar.searchText, "3000")
         XCTAssertTrue(filterBar.showAllPorts)
+        XCTAssertEqual(filterBar.devCount, 0)
+        XCTAssertEqual(filterBar.totalCount, 0)
+    }
+
+    func testFilterBarViewWithPortCounters() {
+        var searchText = ""
+        var showAllPorts = false
+
+        let searchBinding = Binding<String>(
+            get: { searchText },
+            set: { searchText = $0 }
+        )
+        let showAllBinding = Binding<Bool>(
+            get: { showAllPorts },
+            set: { showAllPorts = $0 }
+        )
+
+        let filterBar = FilterBarView(
+            searchText: searchBinding,
+            showAllPorts: showAllBinding,
+            devCount: 3,
+            totalCount: 8
+        )
+        XCTAssertNotNil(filterBar.body)
+        XCTAssertEqual(filterBar.devCount, 3)
+        XCTAssertEqual(filterBar.totalCount, 8)
     }
 
     func testPortRowViewActions() {
@@ -54,14 +80,40 @@ final class ViewsTests: XCTestCase {
         XCTAssertEqual(killedPort?.id, "3000-12345")
     }
 
+    func testPortRowViewSystemDaemonCategory() {
+        let systemPort = ActivePort(
+            port: 52311,
+            pid: 619,
+            processName: "rapportd",
+            commandPath: "/usr/libexec/rapportd",
+            user: "developer",
+            protocols: ["IPv4"],
+            category: .systemDaemon
+        )
+
+        let row = PortRowView(
+            port: systemPort,
+            onOpenInBrowser: { _ in },
+            onKill: { _ in }
+        )
+
+        XCTAssertNotNil(row.body)
+        XCTAssertEqual(row.port.category, .systemDaemon)
+        XCTAssertEqual(row.port.processName, "rapportd")
+    }
+
     func testEmptyStateViewVariations() {
         let defaultEmptyState = EmptyStateView(isFiltered: false)
         XCTAssertFalse(defaultEmptyState.isFiltered)
         XCTAssertNotNil(defaultEmptyState.body)
 
-        let filteredEmptyState = EmptyStateView(isFiltered: true)
+        var cleared = false
+        let filteredEmptyState = EmptyStateView(isFiltered: true, onClearFilter: { cleared = true })
         XCTAssertTrue(filteredEmptyState.isFiltered)
         XCTAssertNotNil(filteredEmptyState.body)
+
+        filteredEmptyState.onClearFilter?()
+        XCTAssertTrue(cleared)
     }
 
     func testPopoverContainerViewIntegration() {
