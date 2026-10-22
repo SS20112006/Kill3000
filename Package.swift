@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "Kill3000",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v14)
     ],
     products: [
         .library(
@@ -33,6 +33,13 @@ let package = Package(
         .testTarget(
             name: "Kill3000EngineTests",
             dependencies: ["Kill3000Engine"],
+            swiftSettings: [
+                .enableExperimentalFeature("StrictConcurrency")
+            ]
+        ),
+        .testTarget(
+            name: "Kill3000AppTests",
+            dependencies: ["Kill3000App"],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]

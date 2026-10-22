@@ -1,10 +1,15 @@
 import Foundation
 
+/// Protocol defining the contract for discovering active listening TCP ports.
+public protocol PortScanning: Sendable {
+    func scan() async throws -> [ActivePort]
+}
+
 /// Actor responsible for asynchronously inspecting listening TCP ports via macOS `lsof`.
 ///
 /// Executes the process off the Swift Concurrency cooperative thread pool to guarantee
 /// non-blocking I/O and zero latency spikes on the `@MainActor`.
-public actor PortScanner {
+public actor PortScanner: PortScanning {
     public typealias CommandRunner = @Sendable () async throws -> String
 
     private let runner: CommandRunner

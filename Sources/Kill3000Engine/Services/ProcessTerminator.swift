@@ -1,11 +1,17 @@
 import Foundation
 import Darwin
 
+/// Protocol defining the contract for terminating processes associated with listening ports.
+public protocol ProcessTerminating: Sendable {
+    func terminate(port: ActivePort) async throws
+    func terminate(pid: pid_t) async throws
+}
+
 /// Service responsible for safely terminating processes associated with listening ports.
 ///
 /// Implements safety barriers (protecting PID <= 1), graceful SIGTERM signaling with
 /// liveness polling, and automatic escalation to SIGKILL if the process fails to exit within 1.5s.
-public struct ProcessTerminator: Sendable {
+public struct ProcessTerminator: ProcessTerminating, Sendable {
     public typealias SignalSender = @Sendable (pid_t, Int32) -> Int32
     public typealias ErrnoProvider = @Sendable () -> Int32
     public typealias Sleeper = @Sendable (Duration) async throws -> Void
