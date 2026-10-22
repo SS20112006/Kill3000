@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import Kill3000Engine
 
 /// Root popover container view displayed in the macOS MenuBarExtra.
@@ -11,7 +12,9 @@ import Kill3000Engine
 /// - Snappy macOS spring animations and hover micro-interactions.
 public struct PopoverContainerView: View {
     @Bindable public var viewModel: PortListViewModel
+    @Environment(\.openWindow) private var openWindow
 
+    @State private var isDashboardHovered: Bool = false
     @State private var isRefreshHovered: Bool = false
     @State private var isQuitHovered: Bool = false
     @State private var isLivePulsing: Bool = false
@@ -31,12 +34,13 @@ public struct PopoverContainerView: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            // Search and Category Filter
+            // Search and Category Filter (Dev, Sugeridas, Todas)
             FilterBarView(
                 searchText: $viewModel.searchText,
-                showAllPorts: $viewModel.showAllPorts,
-                devCount: devPortsCount,
-                totalCount: viewModel.ports.count
+                filterCategory: $viewModel.filterCategory,
+                devCount: viewModel.devPortsCount,
+                suggestedCount: viewModel.suggestedPortsCount,
+                totalCount: viewModel.totalPortsCount
             )
 
             Divider()
@@ -54,7 +58,7 @@ public struct PopoverContainerView: View {
         .frame(width: 420)
         .frame(minHeight: 260, maxHeight: 540)
         .background(.ultraThinMaterial)
-        .sensoryFeedback(.selection, trigger: viewModel.showAllPorts)
+        .sensoryFeedback(.selection, trigger: viewModel.filterCategory)
         .sensoryFeedback(.impact(weight: .medium), trigger: viewModel.ports.count) { old, new in
             new < old // Trigger impact when a port was terminated / removed
         }
@@ -70,12 +74,6 @@ public struct PopoverContainerView: View {
         .onDisappear {
             viewModel.stopPolling()
         }
-    }
-
-    // MARK: - Computed Helpers
-
-    private var devPortsCount: Int {
-        viewModel.ports.filter { $0.category == .development }.count
     }
 
     // MARK: - Subviews
@@ -96,6 +94,33 @@ public struct PopoverContainerView: View {
             }
 
             Spacer()
+
+            // Open Dashboard full-window button (44x44pt target) with keyboard shortcut
+            Button(action: {
+                openWindow(id: "dashboard")
+                NSApplication.shared.activate(ignoringOtherApps: true)
+            }) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isDashboardHovered ? Color.primary.opacity(0.08) : Color.clear)
+                        .frame(width: 26, height: 26)
+
+                    Image(systemName: "macwindow.on.rectangle")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(isDashboardHovered ? .primary : .secondary)
+                }
+            }
+            .buttonStyle(.plain)
+            .frame(minWidth: 44, minHeight: 44)
+            .contentShape(Rectangle())
+            .keyboardShortcut("d", modifiers: .command)
+            .onHover { hovering in
+                withAnimation(.snappy(duration: 0.15)) {
+                    isDashboardHovered = hovering
+                }
+            }
+            .help("Abrir Dashboard completo (⌘D)")
+            .accessibilityLabel("Abrir Dashboard")
 
             // Refresh action button (44x44pt target) with keyboard shortcut
             Button(action: {
@@ -127,8 +152,8 @@ public struct PopoverContainerView: View {
                     isRefreshHovered = hovering
                 }
             }
-            .help("Refresh active ports (⌘R)")
-            .accessibilityLabel("Refresh active ports")
+            .help("Atualizar portas ativas (⌘R)")
+            .accessibilityLabel("Atualizar portas ativas")
 
             // Quit application button (44x44pt target) with keyboard shortcut
             Button(action: {
@@ -153,8 +178,8 @@ public struct PopoverContainerView: View {
                     isQuitHovered = hovering
                 }
             }
-            .help("Quit Kill3000 (⌘Q)")
-            .accessibilityLabel("Quit Kill3000")
+            .help("Fechar Kill3000 (⌘Q)")
+            .accessibilityLabel("Fechar Kill3000")
         }
         .padding(.horizontal, 14)
         .padding(.top, 4)
@@ -188,8 +213,8 @@ public struct PopoverContainerView: View {
             .buttonStyle(.plain)
             .frame(minWidth: 32, minHeight: 32)
             .contentShape(Rectangle())
-            .help("Dismiss alert")
-            .accessibilityLabel("Dismiss error message")
+            .help("Fechar alerta")
+            .accessibilityLabel("Fechar mensagem de erro")
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
@@ -207,17 +232,17 @@ public struct PopoverContainerView: View {
             if viewModel.filteredPorts.isEmpty {
                 EmptyStateView(
                     isFiltered: !viewModel.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        || (!viewModel.showAllPorts && viewModel.ports.contains { $0.category != .development }),
+                        || viewModel.filterCategory != .dev,
                     onClearFilter: {
                         withAnimation(.snappy(duration: 0.2)) {
                             viewModel.searchText = ""
-                            viewModel.showAllPorts = true
+                            viewModel.filterCategory = .dev
                         }
                     }
                 )
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 8) {
+                    LazyVStack(spacing: 6) {
                         ForEach(viewModel.filteredPorts) { port in
                             PortRowView(
                                 port: port,
@@ -250,10 +275,31 @@ public struct PopoverContainerView: View {
 
     private var footerView: some View {
         HStack {
-            Text("\(viewModel.filteredPorts.count) \(viewModel.filteredPorts.count == 1 ? "port" : "ports") listening")
+            Text("\(viewModel.filteredPorts.count) de \(viewModel.totalPortsCount) \(viewModel.totalPortsCount == 1 ? "porta" : "portas")")
                 .font(.system(size: 11, weight: .regular, design: .default))
                 .tracking(0.1) // SF Pro Text
                 .foregroundStyle(.secondary)
+
+            if viewModel.suggestedPortsCount > 0 && viewModel.filterCategory != .suggested {
+                Button(action: {
+                    withAnimation(.snappy(duration: 0.18)) {
+                        viewModel.filterCategory = .suggested
+                    }
+                }) {
+                    HStack(spacing: 3) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 8))
+                        Text("\(viewModel.suggestedPortsCount) para limpar")
+                            .font(.system(size: 10, weight: .semibold, design: .default))
+                    }
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.orange.opacity(0.12), in: RoundedRectangle(cornerRadius: 4, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .help("Filtrar portas órfãs ou inativas recomendadas para fechar")
+            }
 
             Spacer()
 
@@ -269,7 +315,7 @@ public struct PopoverContainerView: View {
                         .tracking(0.1)
                         .foregroundStyle(.secondary)
                 }
-                .help("Background polling is active every 2 seconds")
+                .help("Sondagem em background ativa a cada 2 segundos")
             }
         }
         .padding(.horizontal, 14)

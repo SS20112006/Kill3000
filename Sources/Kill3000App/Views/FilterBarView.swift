@@ -1,15 +1,36 @@
 import SwiftUI
+import Kill3000Engine
 
 /// Filter bar providing search input and a category segment picker
 /// adhering strictly to Apple Human Interface Guidelines and WCAG AA contrast.
 public struct FilterBarView: View {
     @Binding public var searchText: String
-    @Binding public var showAllPorts: Bool
+    private var customCategoryBinding: Binding<PortFilterCategory>?
+    private var legacyShowAllPorts: Binding<Bool>?
+
     public let devCount: Int
+    public let suggestedCount: Int
     public let totalCount: Int
 
     @FocusState private var isSearchFocused: Bool
 
+    /// Modern initializer using `PortFilterCategory` (.dev, .suggested, .all).
+    public init(
+        searchText: Binding<String>,
+        filterCategory: Binding<PortFilterCategory>,
+        devCount: Int = 0,
+        suggestedCount: Int = 0,
+        totalCount: Int = 0
+    ) {
+        self._searchText = searchText
+        self.customCategoryBinding = filterCategory
+        self.legacyShowAllPorts = nil
+        self.devCount = devCount
+        self.suggestedCount = suggestedCount
+        self.totalCount = totalCount
+    }
+
+    /// Legacy compatibility initializer using `showAllPorts: Binding<Bool>`.
     public init(
         searchText: Binding<String>,
         showAllPorts: Binding<Bool>,
@@ -17,9 +38,29 @@ public struct FilterBarView: View {
         totalCount: Int = 0
     ) {
         self._searchText = searchText
-        self._showAllPorts = showAllPorts
+        self.customCategoryBinding = nil
+        self.legacyShowAllPorts = showAllPorts
         self.devCount = devCount
+        self.suggestedCount = 0
         self.totalCount = totalCount
+    }
+
+    private var activeCategoryBinding: Binding<PortFilterCategory> {
+        if let binding = customCategoryBinding {
+            return binding
+        }
+        if let legacy = legacyShowAllPorts {
+            return Binding<PortFilterCategory>(
+                get: { legacy.wrappedValue ? .all : .dev },
+                set: { legacy.wrappedValue = ($0 == .all) }
+            )
+        }
+        return .constant(.dev)
+    }
+
+    /// Compatibility property for test inspections.
+    public var showAllPorts: Bool {
+        activeCategoryBinding.wrappedValue == .all
     }
 
     public var body: some View {
@@ -32,13 +73,13 @@ public struct FilterBarView: View {
                     .padding(.leading, 8)
                     .accessibilityHidden(true)
 
-                TextField("Search port, process, project, framework...", text: $searchText)
+                TextField("Filtrar portas, processos...", text: $searchText)
                     .textFieldStyle(.plain)
                     .focused($isSearchFocused)
                     .font(.system(size: 12, weight: .regular, design: .default))
                     .tracking(0.1) // SF Pro Text optical tracking
                     .foregroundStyle(.primary)
-                    .accessibilityLabel("Search active ports")
+                    .accessibilityLabel("Procurar portas ativas")
 
                 if !searchText.isEmpty {
                     Button(action: {
@@ -54,8 +95,8 @@ public struct FilterBarView: View {
                     .buttonStyle(.plain)
                     .frame(minWidth: 28, minHeight: 28)
                     .contentShape(Rectangle())
-                    .help("Clear search text")
-                    .accessibilityLabel("Clear search")
+                    .help("Limpar pesquisa")
+                    .accessibilityLabel("Limpar pesquisa")
                     .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 } else {
                     Spacer()
@@ -74,20 +115,20 @@ public struct FilterBarView: View {
             .animation(.snappy(duration: 0.18), value: isSearchFocused)
 
             // Segmented picker for category filtering with live counters inline
-            Picker("Port Category", selection: $showAllPorts) {
-                if devCount > 0 || totalCount > 0 {
-                    Text("Dev (\(devCount))").tag(false)
-                    Text("All (\(totalCount))").tag(true)
+            Picker("Categoria", selection: activeCategoryBinding) {
+                Text("Dev (\(devCount))").tag(PortFilterCategory.dev)
+                if suggestedCount > 0 {
+                    Text("Sugeridas (\(suggestedCount))").tag(PortFilterCategory.suggested)
                 } else {
-                    Text("Dev").tag(false)
-                    Text("All").tag(true)
+                    Text("Sugeridas").tag(PortFilterCategory.suggested)
                 }
+                Text("Todas (\(totalCount))").tag(PortFilterCategory.all)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
             .controlSize(.small)
             .fixedSize()
-            .accessibilityLabel("Filter by port category")
+            .accessibilityLabel("Filtrar por categoria de portas")
         }
         .padding(.horizontal, 14)
         .padding(.top, 2)

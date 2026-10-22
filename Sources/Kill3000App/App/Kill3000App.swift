@@ -37,5 +37,11 @@ public struct Kill3000App: App {
                 }
         }
         .menuBarExtraStyle(.window)
+
+        Window("Kill3000 Dashboard", id: "dashboard") {
+            DashboardView(viewModel: viewModel)
+        }
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 840, height: 520)
     }
 }

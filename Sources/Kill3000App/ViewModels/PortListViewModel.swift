@@ -3,6 +3,15 @@ import AppKit
 import Observation
 import Kill3000Engine
 
+/// Filter categories for active listening ports.
+public enum PortFilterCategory: String, Sendable, CaseIterable, Identifiable {
+    case dev = "Dev"
+    case suggested = "Sugeridas"
+    case all = "Todas"
+
+    public var id: String { rawValue }
+}
+
 /// Observable view model managing active port state, live background polling,
 /// search/category filtering, and process operations for Kill3000.
 @Observable
@@ -14,12 +23,19 @@ public final class PortListViewModel {
     /// Full list of active listening ports discovered on the system.
     public var ports: [ActivePort] = []
 
-    /// Current filter text query matching port number or process name.
+    /// Current filter text query matching port number, process, project, or framework.
     public var searchText: String = ""
 
+    /// Active filter category selection.
+    public var filterCategory: PortFilterCategory = .dev
+
+    /// Backward compatibility accessor for legacy code and unit tests.
     /// When `false`, displays only `.development` servers.
     /// When `true`, displays all listening ports including system daemons.
-    public var showAllPorts: Bool = false
+    public var showAllPorts: Bool {
+        get { filterCategory == .all }
+        set { filterCategory = newValue ? .all : .dev }
+    }
 
     /// Indicates whether a scan is currently executing.
     public var isLoading: Bool = false
@@ -32,14 +48,38 @@ public final class PortListViewModel {
         session.task != nil && !(session.task?.isCancelled ?? true)
     }
 
+    /// Count of development servers.
+    public var devPortsCount: Int {
+        ports.filter { $0.category == .development }.count
+    }
+
+    /// Count of ports recommended to be terminated (e.g. orphans or stale idle servers).
+    public var suggestedPortsCount: Int {
+        ports.filter { $0.recommendation.isRecommendedToKill }.count
+    }
+
+    /// Total count of active listening ports.
+    public var totalPortsCount: Int {
+        ports.count
+    }
+
     /// Computed collection of ports filtered by category and search query.
     public var filteredPorts: [ActivePort] {
         let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
 
         return ports.filter { port in
-            // Category filter: hide system daemons unless showAllPorts is enabled
-            if !showAllPorts && port.category != .development {
-                return false
+            // Category filter: Dev, Sugeridas, or Todas
+            switch filterCategory {
+            case .dev:
+                if port.category != .development {
+                    return false
+                }
+            case .suggested:
+                if !port.recommendation.isRecommendedToKill {
+                    return false
+                }
+            case .all:
+                break
             }
 
             // Search query filter: empty query matches all

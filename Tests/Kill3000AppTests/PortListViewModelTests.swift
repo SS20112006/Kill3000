@@ -441,4 +441,66 @@ final class PortListViewModelTests: XCTestCase {
         let failRoot = viewModel.openProjectFolder(path: "/")
         XCTAssertFalse(failRoot)
     }
+
+    @MainActor
+    func testFilterCategorySuggestedAndCounters() {
+        let activeDevPort = ActivePort(
+            port: 3000,
+            pid: 101,
+            processName: "node",
+            user: "dev",
+            protocols: ["IPv4"],
+            category: .development,
+            recommendation: .active(reason: "Active dev")
+        )
+        let orphanDevPort = ActivePort(
+            port: 5173,
+            pid: 102,
+            processName: "vite",
+            user: "dev",
+            protocols: ["IPv4"],
+            category: .development,
+            isOrphan: true,
+            recommendation: .recommended(reason: "Processo órfão")
+        )
+        let systemPort = ActivePort(
+            port: 5000,
+            pid: 103,
+            processName: "ControlCenter",
+            user: "root",
+            protocols: ["IPv4"],
+            category: .systemDaemon,
+            recommendation: .systemProtected(reason: "System")
+        )
+
+        let viewModel = PortListViewModel(scanner: MockPortScanner(), terminator: MockProcessTerminator())
+        viewModel.ports = [activeDevPort, orphanDevPort, systemPort]
+
+        // Counters
+        XCTAssertEqual(viewModel.totalPortsCount, 3)
+        XCTAssertEqual(viewModel.devPortsCount, 2)
+        XCTAssertEqual(viewModel.suggestedPortsCount, 1)
+
+        // Default .dev category: only dev ports
+        viewModel.filterCategory = .dev
+        XCTAssertEqual(viewModel.filteredPorts.map(\.port), [3000, 5173])
+        XCTAssertFalse(viewModel.showAllPorts)
+
+        // .suggested category: only orphan/recommended to kill
+        viewModel.filterCategory = .suggested
+        XCTAssertEqual(viewModel.filteredPorts.map(\.port), [5173])
+        XCTAssertFalse(viewModel.showAllPorts)
+
+        // .all category: all ports
+        viewModel.filterCategory = .all
+        XCTAssertEqual(viewModel.filteredPorts.map(\.port), [3000, 5173, 5000])
+        XCTAssertTrue(viewModel.showAllPorts)
+
+        // Mutating showAllPorts updates filterCategory
+        viewModel.showAllPorts = false
+        XCTAssertEqual(viewModel.filterCategory, .dev)
+
+        viewModel.showAllPorts = true
+        XCTAssertEqual(viewModel.filterCategory, .all)
+    }
 }

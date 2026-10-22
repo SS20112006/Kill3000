@@ -183,4 +183,62 @@ final class ViewsTests: XCTestCase {
         XCTAssertNotNil(container.body)
         XCTAssertEqual(container.viewModel.ports.count, 0)
     }
+
+    func testFilterBarViewWithCategoryBinding() {
+        var category = PortFilterCategory.dev
+        var searchText = ""
+
+        let filterBar = FilterBarView(
+            searchText: Binding(get: { searchText }, set: { searchText = $0 }),
+            filterCategory: Binding(get: { category }, set: { category = $0 }),
+            devCount: 3,
+            suggestedCount: 2,
+            totalCount: 7
+        )
+
+        XCTAssertNotNil(filterBar.body)
+        XCTAssertEqual(filterBar.devCount, 3)
+        XCTAssertEqual(filterBar.suggestedCount, 2)
+        XCTAssertEqual(filterBar.totalCount, 7)
+        XCTAssertFalse(filterBar.showAllPorts)
+
+        category = .all
+        XCTAssertTrue(filterBar.showAllPorts)
+    }
+
+    func testDashboardViewInstantiationAndMetricDisplay() {
+        let testPorts = [
+            ActivePort(
+                port: 3000,
+                pid: 101,
+                processName: "node",
+                user: "developer",
+                protocols: ["IPv4"],
+                category: .development,
+                projectOrAppName: "my-frontend",
+                workingDirectory: "/Users/developer/my-frontend",
+                framework: "Next.js"
+            ),
+            ActivePort(
+                port: 5173,
+                pid: 102,
+                processName: "vite",
+                user: "developer",
+                protocols: ["IPv4"],
+                category: .development,
+                isOrphan: true,
+                recommendation: .recommended(reason: "Processo órfão")
+            )
+        ]
+
+        let mockScanner = MockPortScanner(stubbedPorts: testPorts)
+        let viewModel = PortListViewModel(scanner: mockScanner)
+        viewModel.ports = testPorts
+
+        let dashboard = DashboardView(viewModel: viewModel)
+        XCTAssertNotNil(dashboard.body)
+        XCTAssertEqual(viewModel.totalPortsCount, 2)
+        XCTAssertEqual(viewModel.devPortsCount, 2)
+        XCTAssertEqual(viewModel.suggestedPortsCount, 1)
+    }
 }
