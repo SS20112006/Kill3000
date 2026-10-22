@@ -146,4 +146,24 @@ public struct ActivePort: Identifiable, Sendable, Equatable, Hashable, Codable {
         }
         return cwd
     }
+
+    /// Basename of the working directory (e.g. "my-project" from "/Users/dev/my-project").
+    public var workingDirectoryBasename: String? {
+        guard let cwd = workingDirectory, !cwd.isEmpty, cwd != "/" else { return nil }
+        let basename = (cwd as NSString).lastPathComponent
+        return basename.isEmpty || basename == "/" ? nil : basename
+    }
+
+    /// Single-line compact subtitle showing PID, uptime, and folder without visual crowding.
+    public var compactSubtitle: String {
+        var parts: [String] = ["PID \(pid)"]
+        if let uptime = formattedUptime {
+            parts.append(uptime)
+        }
+        if let folder = workingDirectoryBasename,
+           !displayTitle.lowercased().contains(folder.lowercased()) {
+            parts.append(folder)
+        }
+        return parts.joined(separator: " • ")
+    }
 }

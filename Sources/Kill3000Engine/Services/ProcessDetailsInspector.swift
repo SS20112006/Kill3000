@@ -132,7 +132,8 @@ public struct ProcessDetailsInspector: ProcessEnriching, Sendable {
             parentPid: parentPid,
             processName: processName,
             category: category,
-            uptime: uptime
+            uptime: uptime,
+            isAppBundle: appName != nil
         )
 
         return ProcessEnrichmentData(
@@ -380,7 +381,8 @@ public struct ProcessDetailsInspector: ProcessEnriching, Sendable {
         parentPid: pid_t?,
         processName: String,
         category: ProcessCategory,
-        uptime: TimeInterval?
+        uptime: TimeInterval?,
+        isAppBundle: Bool = false
     ) -> (isOrphan: Bool, recommendation: KillRecommendation) {
         if category == .systemDaemon {
             return (false, .systemProtected(reason: "Serviço essencial do macOS"))
@@ -391,6 +393,11 @@ public struct ProcessDetailsInspector: ProcessEnriching, Sendable {
         // Persistent database engines
         if Self.persistentServiceBinaries.contains(normalizedName) {
             return (false, .active(reason: "Base de dados ou serviço em background"))
+        }
+
+        // GUI Application Bundles (.app) are launched under launchd (PID 1) by normal macOS design
+        if isAppBundle {
+            return (false, .active(reason: "Aplicação macOS ativa"))
         }
 
         // Orphan detection: PPID == 1 indicates parent (e.g. terminal / IDE) died and process was reparented to launchd

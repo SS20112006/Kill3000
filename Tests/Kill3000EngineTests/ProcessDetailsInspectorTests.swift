@@ -188,4 +188,40 @@ final class ProcessDetailsInspectorTests: XCTestCase {
         XCTAssertNotNil(result.uptimeSeconds)
         XCTAssertNotNil(result.parentPid)
     }
+
+    func testActivePortCompactSubtitleAndBasename() {
+        let portWithFolder = ActivePort(
+            port: 3000,
+            pid: 1234,
+            processName: "node",
+            user: "dev",
+            protocols: ["IPv4"],
+            category: .development,
+            projectOrAppName: "my-shop",
+            workingDirectory: "/Users/developer/Projects/backend-api",
+            framework: "Next.js",
+            uptimeSeconds: 3600
+        )
+
+        XCTAssertEqual(portWithFolder.workingDirectoryBasename, "backend-api")
+        // Folder name differs from displayTitle ("Next.js • my-shop"), so it appears in subtitle
+        XCTAssertEqual(portWithFolder.compactSubtitle, "PID 1234 • 1h • backend-api")
+
+        let portWithSameFolderAsProject = ActivePort(
+            port: 5173,
+            pid: 5678,
+            processName: "vite",
+            user: "dev",
+            protocols: ["IPv4"],
+            category: .development,
+            projectOrAppName: "web-client",
+            workingDirectory: "/Users/developer/Projects/web-client",
+            framework: "Vite",
+            uptimeSeconds: 120
+        )
+
+        XCTAssertEqual(portWithSameFolderAsProject.workingDirectoryBasename, "web-client")
+        // Folder name is part of displayTitle ("Vite • web-client"), so subtitle avoids repeating it!
+        XCTAssertEqual(portWithSameFolderAsProject.compactSubtitle, "PID 5678 • 2m")
+    }
 }
