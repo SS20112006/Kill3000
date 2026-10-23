@@ -1,6 +1,6 @@
 cask "kill3000" do
   version "1.0.0"
-  sha256 "f5bf8932b84ca6b2cf4ead328d814e19acf01d2c6c89496604d7cad97b7ba34b"
+  sha256 "1f63ad4214f0887a0da401c7721f28eea9ff660ac73b6662e01ece2b9b06bf29"
 
   url "https://github.com/SS20112006/Kill3000/releases/download/v#{version}/Kill3000.zip"
   name "Kill3000"
