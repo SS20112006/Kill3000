@@ -26,6 +26,9 @@ let package = Package(
         .executableTarget(
             name: "Kill3000App",
             dependencies: ["Kill3000Engine"],
+            resources: [
+                .copy("Assets.xcassets")
+            ],
             swiftSettings: [
                 .enableExperimentalFeature("StrictConcurrency")
             ]

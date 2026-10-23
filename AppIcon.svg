@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 1024 1024" width="1024" height="1024"
+     role="img" aria-labelledby="icon-title">
+  <title id="icon-title">Kill3000</title>
+
+  <defs>
+    <!-- Squircle background: deep space obsidian vertical gradient -->
+    <linearGradient id="g-bg" x1="512" y1="100" x2="512" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#252B35"/>
+      <stop offset="100%" stop-color="#0E1117"/>
+    </linearGradient>
+
+    <!-- Symbol: cold white with faint steel-blue cast -->
+    <linearGradient id="g-sym" x1="512" y1="273" x2="512" y2="687" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#F2F5FF"/>
+      <stop offset="100%" stop-color="#C6CEEA"/>
+    </linearGradient>
+
+    <!-- Zenithal rim specular: simulates Apple's top-edge key light -->
+    <linearGradient id="g-rim" x1="512" y1="100" x2="512" y2="250" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#FFFFFF" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Ambient shadow filter (below squircle, not inside it) -->
+    <filter id="f-shadow" x="-14%" y="-4%" width="128%" height="130%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="24"/>
+    </filter>
+  </defs>
+
+  <!--
+    SQUIRCLE GEOMETRY
+    Body: 824×824 px, centred at (512, 512), margin 100 px optical edge.
+    Corners: cubic bézier continuous curvature (k=0.4431 × r, r=190).
+    Key path nodes (clockwise from top-left tangent):
+      (290,100) → (734,100) top edge
+      corner TR: C (818.2,100) (924,205.8) (924,290)
+      (924,734) right edge
+      corner BR: C (924,818.2) (818.2,924) (734,924)
+      (290,924) bottom edge
+      corner BL: C (205.8,924) (100,818.2) (100,734)
+      (100,290) left edge
+      corner TL: C (100,205.8) (205.8,100) (290,100)
+  -->
+
+  <!-- Ambient drop shadow — rendered on a clone path so the blur doesn't eat the icon -->
+  <path fill="#000000" opacity="0.5" filter="url(#f-shadow)"
+        transform="translate(0, 14)"
+        d="M290 100 L734 100 C818.2 100 924 205.8 924 290
+           L924 734 C924 818.2 818.2 924 734 924
+           L290 924 C205.8 924 100 818.2 100 734
+           L100 290 C100 205.8 205.8 100 290 100 Z"/>
+
+  <!-- Squircle body -->
+  <path fill="url(#g-bg)"
+        d="M290 100 L734 100 C818.2 100 924 205.8 924 290
+           L924 734 C924 818.2 818.2 924 734 924
+           L290 924 C205.8 924 100 818.2 100 734
+           L100 290 C100 205.8 205.8 100 290 100 Z"/>
+
+  <!-- Zenithal rim highlight (1–2 px equivalent, top face only) -->
+  <path fill="url(#g-rim)"
+        d="M290 100 L734 100 C818.2 100 924 205.8 924 290
+           L924 734 C924 818.2 818.2 924 734 924
+           L290 924 C205.8 924 100 818.2 100 734
+           L100 290 C100 205.8 205.8 100 290 100 Z"/>
+
+  <!--
+    POWER SYMBOL
+    IEEE 60417-5009 · Universal 'kill / off' semantic.
+
+    Ring: outer r=175, inner r=127, thickness=48 px.
+    Gap: ±32° from 12-o'clock = 64° total opening.
+
+    Gap tangent points (SVG coords, origin top-left):
+      Outer right: (604.7, 363.6)   Outer left:  (419.3, 363.6)
+      Inner right: (579.3, 404.3)   Inner left:  (444.7, 404.3)
+
+    Stem: 48 px wide (= ring thickness), centred at x=512.
+      x: 488 → 536
+      Top: semicircular pill cap, centre at (512, 297), r=24
+      Bottom: flush with outer ring gap at y=363.6
+
+    Both shapes use the same fill so there is zero hairline between them.
+    fill-rule="evenodd" on the ring punches the inner hole cleanly.
+  -->
+  <g id="power-symbol" fill="url(#g-sym)">
+
+    <!-- Ring band -->
+    <path fill-rule="evenodd"
+          d="M 604.7 363.6
+             A 175 175 0 1 1 419.3 363.6
+             L 444.7 404.3
+             A 127 127 0 1 0 579.3 404.3
+             Z"/>
+
+    <!-- Stem with pill-rounded top cap -->
+    <path d="M 488 363.6
+             L 488 321
+             A 24 24 0 0 1 536 321
+             L 536 363.6
+             Z"/>
+
+  </g>
+
+</svg>

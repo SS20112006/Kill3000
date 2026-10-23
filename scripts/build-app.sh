@@ -12,6 +12,7 @@ CONTENTS_DIR="${APP_DIR}/Contents"
 MACOS_DIR="${CONTENTS_DIR}/MacOS"
 RESOURCES_DIR="${CONTENTS_DIR}/Resources"
 PLIST_SOURCE="${PROJECT_ROOT}/Resources/Info.plist"
+ICON_DIR="${PROJECT_ROOT}/Sources/Kill3000App/Assets.xcassets/AppIcon.appiconset"
 
 echo "==> Building Kill3000 in release mode with Swift Package Manager..."
 cd "${PROJECT_ROOT}"
@@ -40,6 +41,23 @@ else
     echo "Error: Info.plist not found at ${PLIST_SOURCE}" >&2
     exit 1
 fi
+
+echo "==> Building AppIcon.icns from asset catalog..."
+ICONSET_TMP="$(mktemp -d)/AppIcon.iconset"
+mkdir -p "${ICONSET_TMP}"
+cp "${ICON_DIR}/AppIcon-16.png"   "${ICONSET_TMP}/icon_16x16.png"
+cp "${ICON_DIR}/AppIcon-32.png"   "${ICONSET_TMP}/icon_16x16@2x.png"
+cp "${ICON_DIR}/AppIcon-32.png"   "${ICONSET_TMP}/icon_32x32.png"
+cp "${ICON_DIR}/AppIcon-64.png"   "${ICONSET_TMP}/icon_32x32@2x.png"
+cp "${ICON_DIR}/AppIcon-128.png"  "${ICONSET_TMP}/icon_128x128.png"
+cp "${ICON_DIR}/AppIcon-256.png"  "${ICONSET_TMP}/icon_128x128@2x.png"
+cp "${ICON_DIR}/AppIcon-256.png"  "${ICONSET_TMP}/icon_256x256.png"
+cp "${ICON_DIR}/AppIcon-512.png"  "${ICONSET_TMP}/icon_256x256@2x.png"
+cp "${ICON_DIR}/AppIcon-512.png"  "${ICONSET_TMP}/icon_512x512.png"
+cp "${ICON_DIR}/AppIcon-1024.png" "${ICONSET_TMP}/icon_512x512@2x.png"
+iconutil -c icns "${ICONSET_TMP}" -o "${RESOURCES_DIR}/AppIcon.icns"
+rm -rf "${ICONSET_TMP}"
+echo "    AppIcon.icns installed into bundle Resources"
 
 echo "==> Applying ad-hoc codesign to bundle..."
 codesign --force --deep -s - "${APP_DIR}"
